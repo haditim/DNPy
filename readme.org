@@ -1,0 +1,1 @@
+*DNPy* is a Python code package to evaluate continuous wave (CW) Overhauser dynamic nuclear polarization (ODNP) experiments. DNPy has taken the core functionality from [[https://github.com/bennomeier/pyNMR][pyNMR]]. 
