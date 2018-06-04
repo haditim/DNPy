@@ -1,4 +1,6 @@
 # DNPy functions file
+from typing import List
+
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
@@ -14,7 +16,6 @@ from scipy import stats
 from scipy import optimize
 from matplotlib import style
 style.use('seaborn-whitegrid')
-
 
 
 class NMRData(object):
@@ -70,6 +71,7 @@ class NMRData(object):
         self.powerDbm = 0
         self.powerMw = 0
         self.expTime = 0
+        self.maxFreq = 0  # type: int
         if datatype == 'TopSpin':
             # The acqus file containts the spectral width SW_h and 2*SizeTD2 as ##$TD
             # The acqu2s file contains TD1 as ##$TD
@@ -140,7 +142,7 @@ class NMRData(object):
                                                    for l in loopCounters.strip().split(" ")]
                     # We don't need to store all this
                     # else:
-                        # self.parDictionary[line[0][2:].strip()] = line[1].strip()
+                    # self.parDictionary[line[0][2:].strip()] = line[1].strip()
 
             if self.is2D:
                 count = 0
@@ -231,7 +233,7 @@ class NMRData(object):
         lenFid = len(self.allFid[fromPos][0])
         startOffset = int(fraction * lenFid)
         if self.debug:
-            print("fid: ", whichFid)
+            # print("fid: ", whichFid)
             print("startOffset: ", startOffset)
             print("len allFid: ", len(self.allFid))
             print("len allFid[0]: ", len(self.allFid[0]))
@@ -458,7 +460,7 @@ class NMRData(object):
         if scale == "Hz":
             return self.get_index_from_frequency(value)
         elif scale == "ppm":
-            return self.get_indexFromPPM(value)
+            return self.get_index_from_ppm(value)
 
     def get_indices(self, interval, scale="Hz"):
         i1 = self.get_index(interval[0], scale=scale)
@@ -491,8 +493,8 @@ class NMRData(object):
                 start = self.get_index_from_frequency(xlim[0])
                 stop = self.get_index_from_frequency(xlim[1])
             elif scale == "ppm":
-                start = self.get_indexFromPPM(xlim[0])
-                stop = self.get_indexFromPPM(xlim[1])
+                start = self.get_index_from_ppm(xlim[0])
+                stop = self.get_index_from_ppm(xlim[1])
         if complexType == "r":
             data = list(zip(xData[start:stop], yDataR[start:stop]))
         np.savetxt(filename, data, fmt=fmt, delimiter="\t")
@@ -622,8 +624,11 @@ class NMRData(object):
         for spectrum in self.allFid[fromPos]:
             self.allFid[toPos].append([point / factor for point in spectrum])
 
+    def get_index_from_ppm(self, value):
+        return np.argmin(abs(self.ppmScale - ppm))
+
     def process(self):
-        """ Process routine for DNP enhancement and T1 data. """
+        """ Process routine for DNP enhancement, k_sigma and T1 data. """
         if self.expType == 't1':
             self.left_shift(0, 1, self.lSt1)
             # remove the bruker filter, run only once, otherwise the data.fidTime gets
@@ -631,7 +636,7 @@ class NMRData(object):
             self.right_shift(1, 1, self.rSt1)  # removing right handside zeros
         else:
             self.left_shift(0, 1, self.lS)
-            self.right_shift(1, 1, self.rS)  
+            self.right_shift(1, 1, self.rS)
         if self.basCor:  # try to remove Offset if asked to
             self.baseline_correction_mean(1, 1, len(self.fidTime) // 10)
         if self.offCor:
@@ -757,7 +762,6 @@ def fwhm(x, y):
 
         z = np.polyfit(xPolyFit, yPolyFit, 2)
         p = np.poly1d(z)
-
         xThis = p(maxVal50)
         xPoints.append(xThis)
 
@@ -775,6 +779,12 @@ def return_exps(odnpPath, powerFile='', **kwargs):
     filesInDir = os.listdir(odnpPath)
     dirs = []
     results = []
+    dnpEnh = []  # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
+    t1Series = []
+    dnpCounter = 0
+    powerMw = -1
+    attPower = [[], []]
+
     for name in filesInDir:
         try:
             dirs.append(float(name))
@@ -782,21 +792,20 @@ def return_exps(odnpPath, powerFile='', **kwargs):
             if debug:
                 print('{} not NMR experiment({}).'.format(name, e))
     dirs.sort()
-    attPower = [[], []]
     # Taking care of powers csv file
     if powerFile and os.path.isfile(odnpPath + '/' + powerFile + '.csv'):  # This is a csv file
         openfile = open(odnpPath + '/' + powerFile + '.csv', 'r')
         lines = openfile.readlines()
         if len(lines) == 1:
             lines = lines[0].split('\r')
-        lines.pop(0)
-        if len(lines[0].split('\r')[0].split(',')) == 2 and \
-                float(lines[0].split('\r')[0].split(',')[0]) < 14000000.:
+        if len(lines[0].split('\r')[0].split(',')) == 2 and 'time' in lines[0]:
+            lines.pop(0)
             for line in lines:
                 att, power = line.split('\r')[0].split(',')
                 attPower[0].append(float(att))
                 attPower[1].append(float(power))
         elif len(lines[0].split('\r')[0].split(',')) == 3:
+            lines.pop(0)
             for line in lines:
                 time, power, att = line.split('\r')[0].split(',')
                 attPower[0].append(float(att))
@@ -806,10 +815,7 @@ def return_exps(odnpPath, powerFile='', **kwargs):
     else:
         if debug:
             print("Proceding without powers file.")
-    dnpEnh = []  # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
-    t1Series = []
-    dnpCounter = 0
-    powerMw = -1
+    attPower = np.asarray(attPower)
     for i, name in enumerate(dirs):
         try:
             if (phase == 'first' and i == 0) or phase == 'all':
@@ -821,14 +827,23 @@ def return_exps(odnpPath, powerFile='', **kwargs):
                                  "TopSpin", autoPhase=False, ph=ph, **kwargs)
         except Exception as e:
             print("Problem adding exp ", name, ". The error is: ", e)
-        title = result.title
         result.expNum = name
         if 'dBm' in result.title:
             result.powerDbm = float(result.title.split(" ")[-2])
             result.dbSet = None
             result.powerMw = 10.0**((result.powerDbm) / 10.0)
-        elif 'dB' in result.title:
-            result.dbSet = float(result.title[:-2].split("set ", 1)[1])
+        elif result.expType:
+            if 'dB' in result.title:
+                result.dbSet = float(result.title[:-2].split("set ", 1)[1])
+            else:  # for old times when I did not put dB in title
+                try:
+                    result.dbSet = float(result.title.split()[-1])
+                except Exception:
+                    if debug:
+                        print("Experiment %s does not have dB or dBm set in title.\
+                          So I use 60dB attenuation" % result.title)
+                    result.dbSet = 60.
+                    result.powerDbm = 0.
             # This is for when Ryans code is used so that we have discrepencies
             if len(attPower[1, :][attPower[0, :] == result.dbSet]) > 10:
                 result.powerDbm = np.sum(attPower[1, :][attPower[0, :] ==
@@ -848,12 +863,6 @@ def return_exps(odnpPath, powerFile='', **kwargs):
                           format(result.dbSet))
                     continue
             result.powerMw = 10.0**((result.powerDbm + 19.4639) / 10.0)
-        elif result.expType:
-            if debug:
-                print("Experiment %s does not have dB or dBm set in title.\
-                  So I use 60dB attenuation" % result.title)
-            result.powerDbm = None
-            result.dbSet = None
         if result.expType == 'dnp':
             if dnpCounter == 0:
                 normReal = result.real[1][0]
@@ -904,6 +913,7 @@ def return_exps(odnpPath, powerFile='', **kwargs):
 
 
 def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
+    """ Makes figures for ODNP experiment """
     ftWindow = kwargs.get('ftWindow', 200)
     evalPath = kwargs.get('evalPath', 'eval')
     plotDpi = kwargs.get('plotDpi', 250)
@@ -1103,17 +1113,17 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
     ax6.plot(dnpEnh[dnpEnh[:,7]=='bac'][:, 1], dnpEnh[dnpEnh[:,7]=='bac'][:, 6], 'ro', marker="o", label='backward magn')
     ax6.plot(dnpEnh[dnpEnh[:,7]=='for'][:, 1], dnpEnh[dnpEnh[:,7]=='for'][:, 4], 'bo', marker="x", label='forward real')
     ax6.plot(dnpEnh[dnpEnh[:,7]=='bac'][:, 1], dnpEnh[dnpEnh[:,7]=='bac'][:, 4], 'ro', marker="x", label='backward real')
-    for i in range(0, len(dnpEnh[:,0])):
-        if dnpEnh[i, 7] == 'for':
-            ax6.annotate('exp {:d}'.format(int(dnpEnh[i, 0])),
-                         xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                         xytext=(dnpEnh[i, 1]+(max(dnpEnh[:, 1])-min(dnpEnh[:, 1]))/40, dnpEnh[i, 6]),
-                         va='center', ha='left', size=9, color='blue', alpha=0.6)
-        elif dnpEnh[i, 7] == 'bac':
-            ax6.annotate('exp {:d}'.format(int(dnpEnh[i, 0])),
-                         xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                         xytext=(dnpEnh[i, 1]-(max(dnpEnh[:, 1])-min(dnpEnh[:, 1]))/40, dnpEnh[i, 6]),
-                         va='center', ha='right', size=9, color='red', alpha=0.6)
+    # for i in range(0, len(dnpEnh[:,0])):
+    #     if dnpEnh[i, 7] == 'for':
+    #         ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
+    #                      xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
+    #                      xytext=(dnpEnh.view('float32')[i, 1]+(max(dnpEnh.view('float32')[:, 1])-min(dnpEnh.view('float32')[:, 1]))/40, dnpEnh.view('float32')[i, 6]),
+    #                      va='center', ha='left', size=9, color='blue', alpha=0.6)
+    #     elif dnpEnh[i, 7] == 'bac':
+    #         ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
+    #                      xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
+    #                      xytext=(dnpEnh.view('float32')[i, 1]-(max(dnpEnh.view('float32')[:, 1])-min(dnpEnh.view('float32')[:, 1]))/40, dnpEnh.view('float32')[i, 6]),
+    #                      va='center', ha='right', size=9, color='red', alpha=0.6)
     ax6.set_title('Normalized DNP enhancement')
     ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
     ax6.set_xlabel('Power (mW)')

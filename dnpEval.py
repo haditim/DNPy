@@ -1,6 +1,10 @@
+from typing import List
+
 from functions import *
+from functions import NMRData
 
 path = '/mnt/EPR-HADI/HADI/Data/ODNP/Tests/20180528_H2O_07TubeNew_NewLongFixedCoil'
+powerFile = ''
 kwargs = {
     't1Calc': 'PCreal',
     'phase': 'first',  # all, none, first
@@ -20,5 +24,8 @@ kwargs = {
     'debug': False,
     'dumpToCsv': True,
     'figSize': (13, 8),
+    'powerFile': powerFile,
     }
-exps = return_exps(path, **kwargs)
+
+if __name__ == '__main__':
+    exps = return_exps(path, **kwargs)  # type: List[NMRData]
