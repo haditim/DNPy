@@ -4,6 +4,7 @@ from typing import List
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
 
 from scipy import fft
 from scipy.fftpack import fftshift
@@ -362,7 +363,6 @@ class NMRData(object):
             print("Using pivot for first order phase correction")
             index = self.get_index(pivot, scale=scale)
             phaseValues = phaseValues - phaseValues[index]
-            0
         if degree:
             phaseValues = phaseValues * np.pi / 180
         self.allFid[toPos] = [spectrum * np.exp(-1j * phaseValues)
@@ -728,7 +728,7 @@ class NMRData(object):
             elif self.t1Calc == 'PCmagn':
                 # set to whatever you want to be fitted and plotted and source of T1
                 self.fitData = [self.phC[0], self.phC[2]]
-            self.t1fit = fitT1(self.fitData[0], self.fitData[1])
+            self.t1fit = fit_t1(self.fitData[0], self.fitData[1])
 
 
 def fwhm(x, y):
@@ -867,7 +867,7 @@ def return_exps(odnpPath, powerFile='', **kwargs):
             if dnpCounter == 0:
                 normReal = result.real[1][0]
                 normMagn = result.magn[1][0]
-                # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
+                # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
                 dnpEnh.append([result.expNum,
                                result.powerMw,
                                result.powerDbm,
@@ -875,7 +875,7 @@ def return_exps(odnpPath, powerFile='', **kwargs):
                                result.real[1][0]/normReal,
                                result.magn[1][0],
                                result.magn[1][0]/normMagn,
-                               'for'])
+                               1])
             elif result.powerMw >= powerMw:
                 dnpEnh.append([result.expNum,
                                result.powerMw,
@@ -884,7 +884,7 @@ def return_exps(odnpPath, powerFile='', **kwargs):
                                result.real[1][0]/normReal,
                                result.magn[1][0],
                                result.magn[1][0]/normMagn,
-                               'for'])
+                               1])
             else:
                 dnpEnh.append([result.expNum,
                                result.powerMw,
@@ -893,7 +893,7 @@ def return_exps(odnpPath, powerFile='', **kwargs):
                                result.real[1][0]/normReal,
                                result.magn[1][0],
                                result.magn[1][0]/normMagn,
-                               'bac'])
+                               0])
             dnpCounter += 1
             powerMw = result.powerMw
         elif result.expType == 't1':
@@ -1109,21 +1109,21 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
             plt.close(figure)
     # DNP figures
     # DNP enhancement
-    ax6.plot(dnpEnh[dnpEnh[:,7]=='for'][:, 1], dnpEnh[dnpEnh[:,7]=='for'][:, 6], 'bo', marker="o", label='forward magn.')
-    ax6.plot(dnpEnh[dnpEnh[:,7]=='bac'][:, 1], dnpEnh[dnpEnh[:,7]=='bac'][:, 6], 'ro', marker="o", label='backward magn')
-    ax6.plot(dnpEnh[dnpEnh[:,7]=='for'][:, 1], dnpEnh[dnpEnh[:,7]=='for'][:, 4], 'bo', marker="x", label='forward real')
-    ax6.plot(dnpEnh[dnpEnh[:,7]=='bac'][:, 1], dnpEnh[dnpEnh[:,7]=='bac'][:, 4], 'ro', marker="x", label='backward real')
-    # for i in range(0, len(dnpEnh[:,0])):
-    #     if dnpEnh[i, 7] == 'for':
-    #         ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
-    #                      xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-    #                      xytext=(dnpEnh.view('float32')[i, 1]+(max(dnpEnh.view('float32')[:, 1])-min(dnpEnh.view('float32')[:, 1]))/40, dnpEnh.view('float32')[i, 6]),
-    #                      va='center', ha='left', size=9, color='blue', alpha=0.6)
-    #     elif dnpEnh[i, 7] == 'bac':
-    #         ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
-    #                      xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-    #                      xytext=(dnpEnh.view('float32')[i, 1]-(max(dnpEnh.view('float32')[:, 1])-min(dnpEnh.view('float32')[:, 1]))/40, dnpEnh.view('float32')[i, 6]),
-    #                      va='center', ha='right', size=9, color='red', alpha=0.6)
+    ax6.plot(dnpEnh[dnpEnh[:,7]==1][:, 1], dnpEnh[dnpEnh[:,7]==1][:, 6], 'bo', marker="o", label='forward magn.')
+    ax6.plot(dnpEnh[dnpEnh[:,7]==0][:, 1], dnpEnh[dnpEnh[:,7]==0][:, 6], 'ro', marker="o", label='backward magn')
+    ax6.plot(dnpEnh[dnpEnh[:,7]==1][:, 1], dnpEnh[dnpEnh[:,7]==1][:, 4], 'bo', marker="x", label='forward real')
+    ax6.plot(dnpEnh[dnpEnh[:,7]==0][:, 1], dnpEnh[dnpEnh[:,7]==0][:, 4], 'ro', marker="x", label='backward real')
+    for i in range(0, len(dnpEnh[:,0])):
+        if dnpEnh[i, 7] == 1:
+            ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
+                         xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
+                         xytext=(dnpEnh[i, 1]+(max(dnpEnh[:, 1])-min(dnpEnh[:, 1]))/40, dnpEnh[i, 6]),
+                         va='center', ha='left', size=9, color='blue', alpha=0.6)
+        elif dnpEnh[i, 7] == 0:
+            ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
+                         xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
+                         xytext=(dnpEnh[i, 1]-(max(dnpEnh[:, 1])-min(dnpEnh[:, 1]))/40, dnpEnh[i, 6]),
+                         va='center', ha='right', size=9, color='red', alpha=0.6)
     ax6.set_title('Normalized DNP enhancement')
     ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
     ax6.set_xlabel('Power (mW)')
@@ -1166,7 +1166,7 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
     # Main T1 figure
     figure = plt.figure(figsize=figSize)
     # Generated linear fit
-    t1_fit_series = FitT1Series(t1Series[:,1], t1Series[:,3], t1Series[:,4])
+    t1_fit_series = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4])
     plt.errorbar(t1Series[:,1], t1Series[:,3], yerr=t1Series[:,4],
                  fmt='+', capthick=2, capsize=2, label=r'$T_1$ experiments')
     plt.plot(t1Series[:,1], t1Series[:,1]*t1_fit_series[0]+t1_fit_series[1], '--k', label=r'fit: $T_1(p)={{{:.4f}}}\times p+{{{:.2f}}}$'.format(
@@ -1185,7 +1185,7 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
     plt.close(figure)
 
 
-def fitT1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitting
+def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitting
     def t1ir(x, si0, c, t1):  # Defines the T1 function.
         return si0+(-c-si0)*np.exp(-x/t1)
     # calls the curve fitting routine using the function described above
@@ -1207,7 +1207,23 @@ def fitT1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitti
     }
 
 
-def FitT1Series(power, t1, t1error):
+def fit_enhancement(dnpEnh):
+    def func(x, a, b, c, d):
+        return a * np.exp(-b * x ** c) + d
+    popt, pcov = curve_fit(func, power, enhancement)
+    eMax = func(np.inf, *popt)
+    eP = 1 - (1 - eMax) / 2
+    sd = 0  # square deviation
+    for i in range(len(power)):
+        sd += np.square(enhancement[i] - func(power[i], *popt))
+    rmsd = np.sqrt(sd / len(power))
+    xdata = np.linspace(min(power), max(power), 50000)
+    ydata = func(xdata, *popt)
+    eHalf = min(abs(ydata - eP))
+    pHalf = np.asarray(zip(xdata, ydata))[abs(ydata - eP) == eHalf][0][0]
+
+    
+def fit_t1_series(power, t1, t1error):
     p, v = np.polyfit(np.asarray(power), np.asarray(t1), 1, w=1/np.asarray(t1error))
     # line = slope*power+intercept
     # rmsd = np.sqrt(((np.array(t1)-np.array(line))**2).mean())
