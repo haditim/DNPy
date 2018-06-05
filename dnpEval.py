@@ -3,8 +3,8 @@ from typing import List
 from functions import *
 from functions import NMRData
 
-path = '/mnt/EPR-HADI/HADI/Data/ODNP/Tests/20180528_H2O_07TubeNew_NewLongFixedCoil'
-powerFile = ''
+path = '/mnt/EPR-HADI/HADI/Data/ODNP/Tests/20180518_TCDA1_ON_pH11'
+powerFile = 'powerBU'
 kwargs = {
     't1Calc': 'PCreal',
     'phase': 'first',  # all, none, first

@@ -16,11 +16,11 @@ import os.path
 from scipy import stats
 from scipy import optimize
 from matplotlib import style
+
 style.use('seaborn-whitegrid')
 
 
 class NMRData(object):
-
     """
     NMRData objects is used to import and store NMRData from several file formats.
     Usage:
@@ -55,7 +55,7 @@ class NMRData(object):
         self.autoPhase = kwargs.get('autoPhase', True)
         self.ftWindow = kwargs.get('ftWindow', 200)
         self.maxWin = kwargs.get('maxWin', 1000)
-        self.t1Calc =  kwargs.get('t1Calc', 'PCmagn')
+        self.t1Calc = kwargs.get('t1Calc', 'PCmagn')
         if datatype == '':
             print("No Datatype - Setting it to ntnmr")
             datatype = "ntnmr"
@@ -200,7 +200,7 @@ class NMRData(object):
             # here we create one array of complex numbers for each of the FIDs
             # i runs over all fids in a ser file, in case of a fid file i = 0
             # TD1 is number of FIDs, TD2 is number of datapoints in each FID
-            for i in range(0,  self.sizeTD1):
+            for i in range(0, self.sizeTD1):
                 realPart = self.data[int(i * self.sizeTD2 * 2):int((i + 1) * self.sizeTD2 * 2):2]
                 imagPart = sp.multiply(
                     self.data[int(i * self.sizeTD2 * 2 + 1):
@@ -389,7 +389,7 @@ class NMRData(object):
         self.fidTimeHistory['bZeroFilling'] = self.fidTime
         self.fidTime = np.linspace(0, (len(self.fidTime)
                                        - 1 + totalPoints) * self.dwellTime, num=len(self.fidTime)
-                                   + totalPoints)
+                                                                                + totalPoints)
 
     def get_joined_partial_spectra(self, fromPos, start, stop, scale="Hz", returnX=False):
         spectra = []
@@ -449,7 +449,8 @@ class NMRData(object):
 
     def get_center_frequency(self, fromPos, index, start, stop, scale="Hz"):
         ind = np.where(abs(self.allFid[fromPos][index]) == max(abs(
-            self.allFid[fromPos][index][self.get_index_from_frequency(start):self.get_index_from_frequency(stop)])))[0][0]
+            self.allFid[fromPos][index][self.get_index_from_frequency(start):self.get_index_from_frequency(stop)])))[0][
+            0]
         frequency = self.frequency[ind]
         return ind, frequency
 
@@ -517,7 +518,7 @@ class NMRData(object):
         assert start < stop, "start should be smaller than stop"
         assert penalty > 0, "penalty shoud be possitive"
         assert type(derivative) is int, "derivative should be a (small possitive) integer"
-        assert derivative > 0,  "need derivative > 0"
+        assert derivative > 0, "need derivative > 0"
         spectrum = np.array(self.allFid[fromPos][index])
         # normalize the spectrum:
         spectrum = spectrum / np.abs(spectrum).sum()
@@ -597,7 +598,7 @@ class NMRData(object):
         # calculate the penalty for the normalized real part
         for point in spect:
             if point < 0:
-                penalty += point**2
+                penalty += point ** 2
         return penalty * gamma
 
     def __tryPhase(self, correction, spectrum, m, gamma):
@@ -662,8 +663,8 @@ class NMRData(object):
                 print('No phase cycling channel found ({}).'.format(e))
             self.phaseCycles = 1
             vdListLen = 1
-        self.real = [[] for i in range(0, int(self.phaseCycles+1))]
-        self.magn = [[] for i in range(0, int(self.phaseCycles+1))]
+        self.real = [[] for i in range(0, int(self.phaseCycles + 1))]
+        self.magn = [[] for i in range(0, int(self.phaseCycles + 1))]
         self.phC = [[] for i in range(0, 3)]  # power, phasecycled real, phasecycles magn.
         try:
             self.fwhm = fwhm(self.frequency, np.real(self.allFid[5][0]))
@@ -704,19 +705,19 @@ class NMRData(object):
                 self.phC[1].append(0)
                 self.phC[2].append(0)
             # Appending integral values
-            self.real[int(i % self.phaseCycles)+1].append(calIntReal)
-            self.magn[int(i % self.phaseCycles)+1].append(calIntMagn*calIntReal/abs(calIntReal))
+            self.real[int(i % self.phaseCycles) + 1].append(calIntReal)
+            self.magn[int(i % self.phaseCycles) + 1].append(calIntMagn * calIntReal / abs(calIntReal))
         # phase cycling
         self.phaseCSigns = [+1 if i < self.phaseCycles /
-                            2. else -1 for i in range(0, int(self.phaseCycles))]
+                                  2. else -1 for i in range(0, int(self.phaseCycles))]
         self.phC = np.asarray(self.phC)
-        for i in range(1, int(self.phaseCycles+1)):
+        for i in range(1, int(self.phaseCycles + 1)):
             # real channel
-            self.phC[1] = self.phC[1]+self.real[i] \
-                if self.phaseCSigns[i-1] == +1 else self.phC[1]-self.real[i]
+            self.phC[1] = self.phC[1] + self.real[i] \
+                if self.phaseCSigns[i - 1] == +1 else self.phC[1] - self.real[i]
             # magnitude
-            self.phC[2] = self.phC[2]+self.magn[i] \
-                if self.phaseCSigns[i-1] == +1 else self.phC[2]-self.magn[i]
+            self.phC[2] = self.phC[2] + self.magn[i] \
+                if self.phaseCSigns[i - 1] == +1 else self.phC[2] - self.magn[i]
         if self.expType == 't1':
             if self.t1Calc == 'real':  # real, magn, PCreal, PCmagn
                 self.fitData = [self.real[0], self.real[1]]
@@ -736,7 +737,7 @@ def fwhm(x, y):
     The FWHM is returned in the same units as those of x."""
 
     maxVal = np.max(y)
-    maxVal50 = 0.5*maxVal
+    maxVal50 = 0.5 * maxVal
 
     # this is to detect if there are multiple values
     biggerCondition = [a > maxVal50 for a in y]
@@ -744,8 +745,8 @@ def fwhm(x, y):
     changePoints = []
     xPoints = []
 
-    for k in range(len(biggerCondition)-1):
-        if biggerCondition[k+1] != biggerCondition[k]:
+    for k in range(len(biggerCondition) - 1):
+        if biggerCondition[k + 1] != biggerCondition[k]:
             changePoints.append(k)
 
     assert len(changePoints) == 2, "More than two crossings of the threshold found."
@@ -757,8 +758,8 @@ def fwhm(x, y):
         # note that here we are fitting the x values as a function of the y values.
         # then we can use the polynom to compute the value of x at the threshold, i.e. at maxVal50.
 
-        yPolyFit = x[k-1:k+2]
-        xPolyFit = y[k-1:k+2]
+        yPolyFit = x[k - 1:k + 2]
+        xPolyFit = y[k - 1:k + 2]
 
         z = np.polyfit(xPolyFit, yPolyFit, 2)
         p = np.poly1d(z)
@@ -831,7 +832,7 @@ def return_exps(odnpPath, powerFile='', **kwargs):
         if 'dBm' in result.title:
             result.powerDbm = float(result.title.split(" ")[-2])
             result.dbSet = None
-            result.powerMw = 10.0**((result.powerDbm) / 10.0)
+            result.powerMw = 10.0 ** ((result.powerDbm) / 10.0)
         elif result.expType:
             if 'dB' in result.title:
                 result.dbSet = float(result.title[:-2].split("set ", 1)[1])
@@ -862,7 +863,7 @@ def return_exps(odnpPath, powerFile='', **kwargs):
                     print('I could not find power for {:.0f} dB and I won\'t be using it'.
                           format(result.dbSet))
                     continue
-            result.powerMw = 10.0**((result.powerDbm + 19.4639) / 10.0)
+            result.powerMw = 10.0 ** ((result.powerDbm + 19.4639) / 10.0)
         if result.expType == 'dnp':
             if dnpCounter == 0:
                 normReal = result.real[1][0]
@@ -872,27 +873,27 @@ def return_exps(odnpPath, powerFile='', **kwargs):
                                result.powerMw,
                                result.powerDbm,
                                result.real[1][0],
-                               result.real[1][0]/normReal,
+                               result.real[1][0] / normReal,
                                result.magn[1][0],
-                               result.magn[1][0]/normMagn,
+                               result.magn[1][0] / normMagn,
                                1])
             elif result.powerMw >= powerMw:
                 dnpEnh.append([result.expNum,
                                result.powerMw,
                                result.powerDbm,
                                result.real[1][0],
-                               result.real[1][0]/normReal,
+                               result.real[1][0] / normReal,
                                result.magn[1][0],
-                               result.magn[1][0]/normMagn,
+                               result.magn[1][0] / normMagn,
                                1])
             else:
                 dnpEnh.append([result.expNum,
                                result.powerMw,
                                result.powerDbm,
                                result.real[1][0],
-                               result.real[1][0]/normReal,
+                               result.real[1][0] / normReal,
                                result.magn[1][0],
-                               result.magn[1][0]/normMagn,
+                               result.magn[1][0] / normMagn,
                                0])
             dnpCounter += 1
             powerMw = result.powerMw
@@ -904,7 +905,7 @@ def return_exps(odnpPath, powerFile='', **kwargs):
                              result.t1fit['t1'],
                              result.t1fit['t1error']])
         print("Evaluated {}\t of type {}\t @{:.3f} W".format(
-            result.title, result.expType, result.powerMw/1000))
+            result.title, result.expType, result.powerMw / 1000))
         results.append(result)
     if plotExts:
         print('Plotting figures...')
@@ -959,9 +960,9 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
     fig6 = plt.figure(figsize=figSize)
     ax6 = fig6.add_subplot(111)
     # Generating figures for dnp folders and collection of data
-    for i,  value in enumerate(results):
+    for i, value in enumerate(results):
         print('Ploting exp {} figures'.format(str(int(value.expNum))))
-        if value.expType == 'dnp':    # FID plots
+        if value.expType == 'dnp':  # FID plots
             figure = plt.figure(figsize=figSize)
             plt.plot(value.fidTimeHistory['bLeftShift'], np.real(
                 value.allFid[0][0]), label='real')
@@ -972,17 +973,19 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
             plt.ylabel('Signal (a.u.)')
             plt.tight_layout()
             plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID.'+x)), dpi=plotDpi)
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
             ax0.plot(value.fidTimeHistory['bLeftShift'], np.real(value.allFid[0][0]), label=(
                 '{} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # original
             ax1.plot(value.fidTimeHistory['bZeroFilling'], np.real(value.allFid[1][0]), label=(
-                '{} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # after left and right shift and baselineCorrection
+                '{} dBm\t{:.2f} mW power'.format(value.powerDbm,
+                                                 value.powerMw)).expandtabs())  # after left and right shift and baselineCorrection
             ax2.plot(value.fidTime, np.real(value.allFid[2][0]), label=(
                 '{} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # after zero filling
             ax3.plot(value.fidTime, np.real(value.allFid[3][0]), label=(
-                '{} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # after exponential windowing
+                '{} dBm\t{:.2f} mW power'.format(value.powerDbm,
+                                                 value.powerMw)).expandtabs())  # after exponential windowing
             # FT plots
             figure = plt.figure(figsize=figSize)
             plt.plot(value.frequency, np.real(
@@ -996,25 +999,25 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
             plt.xlabel('Frequency (Hz)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
-            plt.xlim(value.maxFreq-value.ftWindow,
-                     value.maxFreq+value.ftWindow)
+            plt.xlim(value.maxFreq - value.ftWindow,
+                     value.maxFreq + value.ftWindow)
             plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT.'+x)), dpi=plotDpi)
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
             ax4.plot(value.frequency, np.real(value.allFid[5][0]), label=(
                 '{} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())
             ax4.set_title('FT after phasing to %.0f degrees' % value.ph)
             ax4.grid(True)
-            ax4.set_xlim(value.maxFreq-value.ftWindow,
-                         value.maxFreq+value.ftWindow)
+            ax4.set_xlim(value.maxFreq - value.ftWindow,
+                         value.maxFreq + value.ftWindow)
             # Data for DNP figs
             # centerFreq.append([((value.expTime-expStart)/60.),
             #                    value.expCenterFreq, value.expNum, value.powerMw])
         elif value.expType == 't1':
             figure = plt.figure(figsize=figSize)
             plt.errorbar(value.fitData[0], value.fitData[1],
-                         yerr=(value.fitData[1]-value.t1fit['evalY']),
+                         yerr=(value.fitData[1] - value.t1fit['evalY']),
                          fmt='+',
                          label='data', capthick=2, capsize=2)
             plt.plot(value.t1fit['xdata'], value.t1fit['ydata'], label=value.t1fit['t1FitFormula'])
@@ -1026,37 +1029,37 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
             plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1.'+x)), dpi=plotDpi)
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
             # Real part figure
             figure = plt.figure(figsize=figSize)
             for j in range(1, len(value.real)):
-                plt.plot(value.real[0], value.real[j], label='PC'+str(j))
+                plt.plot(value.real[0], value.real[j], label='PC' + str(j))
             plt.title('Real integral of phase cycle channels of $T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
                 value.powerMw, value.ph))
             plt.plot(value.phC[0], value.phC[1], '--',
-                     label='PhaseCycled using'+str(value.phaseCSigns))
+                     label='PhaseCycled using' + str(value.phaseCSigns))
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
             plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1_PC_real.'+x)), dpi=plotDpi)
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1_PC_real.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
             # Magnitude part figure
             figure = plt.figure(figsize=figSize)
             for j in range(1, len(value.magn)):
-                plt.plot(value.magn[0], value.magn[j], label='PC'+str(j))
+                plt.plot(value.magn[0], value.magn[j], label='PC' + str(j))
             plt.title('Magnitude integral of phase cycle channels of $T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
                 value.powerMw, value.ph))
             plt.plot(value.phC[0], value.phC[2], '--',
-                     label='PhaseCycled using'+str(value.phaseCSigns))
+                     label='PhaseCycled using' + str(value.phaseCSigns))
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
             plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1_PC_magn.'+x)), dpi=plotDpi)
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1_PC_magn.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
             # Figure for fourier transforms
@@ -1064,15 +1067,15 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
             for j, time in enumerate(value.allFid[5]):
                 if j % (value.phaseCycles) == 0:  # only first scan
                     plt.plot(value.frequency, np.real(value.allFid[5][j]),
-                             label=('{:.2f}s'.format(value.vdList[int(j/value.phaseCycles)])))
+                             label=('{:.2f}s'.format(value.vdList[int(j / value.phaseCycles)])))
             plt.title('FT (real) at {:.2f} mW power, {}$^\circ$ phase'.format(
                 value.powerMw, value.ph))
             plt.xlabel('Frequency (Hz)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
-            plt.xlim(value.maxFreq-value.ftWindow, value.maxFreq+value.ftWindow)
+            plt.xlim(value.maxFreq - value.ftWindow, value.maxFreq + value.ftWindow)
             plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT.'+x)), dpi=plotDpi)
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
             # Figure for FIDs
@@ -1081,15 +1084,15 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
             for j, time in enumerate(value.allFid[5]):
                 if j % (value.phaseCycles) == 0:  # only first scan
                     plt.plot(value.fidTime, np.real(value.allFid[2][j]),
-                             label='{:.2f}s'.format(value.vdList[int(j/value.phaseCycles)]))
+                             label='{:.2f}s'.format(value.vdList[int(j / value.phaseCycles)]))
             plt.title('$T_1$ FIDs at {:.2f} mW power, {}$^\circ$ phase'.format(
                 value.powerMw, value.ph))
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
-            plt.xlim(0, max(value.fidTime)/3.)
+            plt.xlim(0, max(value.fidTime) / 3.)
             plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_corrected.'+x)), dpi=plotDpi)
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_corrected.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
             figure = plt.figure(figsize=figSize)
@@ -1097,33 +1100,36 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
             for j, time in enumerate(value.allFid[5]):
                 if j % (value.phaseCycles) == 0:  # only first scan
                     plt.plot(value.fidTimeHistory['bLeftShift'], np.real(value.allFid[0][j]),
-                             label='{:.2f}s'.format(value.vdList[int(j/value.phaseCycles)]))
+                             label='{:.2f}s'.format(value.vdList[int(j / value.phaseCycles)]))
             plt.title('$T_1$ FIDs at {:.2f} mW power, {}$^\circ$ phase'.format(
                 value.powerMw, value.ph))
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
             plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_raw.'+x)), dpi=plotDpi)
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_raw.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
     # DNP figures
     # DNP enhancement
-    ax6.plot(dnpEnh[dnpEnh[:,7]==1][:, 1], dnpEnh[dnpEnh[:,7]==1][:, 6], 'bo', marker="o", label='forward magn.')
-    ax6.plot(dnpEnh[dnpEnh[:,7]==0][:, 1], dnpEnh[dnpEnh[:,7]==0][:, 6], 'ro', marker="o", label='backward magn')
-    ax6.plot(dnpEnh[dnpEnh[:,7]==1][:, 1], dnpEnh[dnpEnh[:,7]==1][:, 4], 'bo', marker="x", label='forward real')
-    ax6.plot(dnpEnh[dnpEnh[:,7]==0][:, 1], dnpEnh[dnpEnh[:,7]==0][:, 4], 'ro', marker="x", label='backward real')
-    for i in range(0, len(dnpEnh[:,0])):
+    #enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
+    ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7] == 1][:, 6], 'bo', marker="o", label='forward magn.')
+    ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7] == 0][:, 6], 'ro', marker="o", label='backward magn')
+    ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7] == 1][:, 4], 'bo', marker="x", label='forward real')
+    ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7] == 0][:, 4], 'ro', marker="x", label='backward real')
+    for i in range(0, len(dnpEnh[:, 0])):
         if dnpEnh[i, 7] == 1:
             ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
                          xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                         xytext=(dnpEnh[i, 1]+(max(dnpEnh[:, 1])-min(dnpEnh[:, 1]))/40, dnpEnh[i, 6]),
+                         xytext=(dnpEnh[i, 1] + (max(dnpEnh[:, 1]) - min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
                          va='center', ha='left', size=9, color='blue', alpha=0.6)
         elif dnpEnh[i, 7] == 0:
             ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
                          xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                         xytext=(dnpEnh[i, 1]-(max(dnpEnh[:, 1])-min(dnpEnh[:, 1]))/40, dnpEnh[i, 6]),
+                         xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) - min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
                          va='center', ha='right', size=9, color='red', alpha=0.6)
+    #ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], label='(magn.) '+enhancementFit['enhancementFormula'])
+    #ax6.annotate(enhancementFit['annotation'], xy=(0.4, 0.5), xycoords='axes fraction')
     ax6.set_title('Normalized DNP enhancement')
     ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
     ax6.set_xlabel('Power (mW)')
@@ -1132,32 +1138,32 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
     # saving figures in evaluation directory
     ax0.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     fig0.tight_layout()
-    [fig0.savefig(os.path.join(path, evalPath, ('01_FIDs_raw.'+x)), dpi=plotDpi) for x in plotExts]
+    [fig0.savefig(os.path.join(path, evalPath, ('01_FIDs_raw.' + x)), dpi=plotDpi) for x in plotExts]
     plt.close(fig0)
     ax1.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     fig1.tight_layout()
-    [fig1.savefig(os.path.join(path, evalPath, ('02_FIDs_after_LS_RS_baseline.'+x)),
+    [fig1.savefig(os.path.join(path, evalPath, ('02_FIDs_after_LS_RS_baseline.' + x)),
                   dpi=plotDpi) for x in plotExts]
     plt.close(fig1)
     ax2.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     fig2.tight_layout()
-    [fig2.savefig(os.path.join(path, evalPath, ('03_FIDs_after_zero_filling.'+x)), dpi=plotDpi)
+    [fig2.savefig(os.path.join(path, evalPath, ('03_FIDs_after_zero_filling.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(fig2)
     ax3.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     fig3.tight_layout()
-    [fig3.savefig(os.path.join(path, evalPath, ('04_FIDs_after_exp_windowing.'+x)), dpi=plotDpi)
+    [fig3.savefig(os.path.join(path, evalPath, ('04_FIDs_after_exp_windowing.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(fig3)
     ax4.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     fig4.tight_layout()
-    [fig4.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing.'+x)), dpi=plotDpi)
+    [fig4.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(fig4)
     plt.close(fig5)
     ax6.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     fig6.tight_layout()
-    [fig6.savefig(os.path.join(path, evalPath, ('normalized_ODNP_enhancement.'+x)), dpi=plotDpi)
+    [fig6.savefig(os.path.join(path, evalPath, ('normalized_ODNP_enhancement.' + x)), dpi=plotDpi)
      for x in plotExts]
     #  dumpAllToCSV(path, evalPath, dnpEnh)
     print("done")
@@ -1166,28 +1172,31 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
     # Main T1 figure
     figure = plt.figure(figsize=figSize)
     # Generated linear fit
-    t1_fit_series = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4])
-    plt.errorbar(t1Series[:,1], t1Series[:,3], yerr=t1Series[:,4],
+    t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4])
+    kSigma = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
+    plt.errorbar(t1Series[:, 1], t1Series[:, 3], yerr=t1Series[:, 4],
                  fmt='+', capthick=2, capsize=2, label=r'$T_1$ experiments')
-    plt.plot(t1Series[:,1], t1Series[:,1]*t1_fit_series[0]+t1_fit_series[1], '--k', label=r'fit: $T_1(p)={{{:.4f}}}\times p+{{{:.2f}}}$'.format(
-        t1_fit_series[0], t1_fit_series[1]))
-    for i in range(0, len(t1Series[:,0])):
+    plt.plot(t1Series[:, 1], t1Series[:, 1] * t1FitSeries['coefs'][0] + t1FitSeries['coefs'][1], '--k',
+             label=r'fit: $T_1(p)={{{:.4f}}}\times p+{{{:.2f}}}$'.format(
+                 t1FitSeries['coefs'][0], t1FitSeries['coefs'][1]))
+    for i in range(0, len(t1Series[:, 0])):
         plt.annotate('exp {:d}'.format(int(t1Series[i, 0])),
                      xy=(t1Series[i, 1], t1Series[i, 3]),
-                     xytext=(t1Series[i, 1]+(max(t1Series[:, 1])-min(t1Series[:, 1]))/40, t1Series[i, 3]),
+                     xytext=(t1Series[i, 1] + (max(t1Series[:, 1]) - min(t1Series[:, 1])) / 40, t1Series[i, 3]),
                      va='center', ha='left', size=9, color='blue', alpha=0.6)
     plt.xlabel('Power (mW)')
     plt.ylabel('Time (s)')
     figure.tight_layout()
     plt.legend()
-    [plt.savefig(os.path.join(path, evalPath, ('T1_time_series.'+x)), dpi=plotDpi)
+    [plt.savefig(os.path.join(path, evalPath, ('T1_time_series.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(figure)
 
 
 def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitting
     def t1ir(x, si0, c, t1):  # Defines the T1 function.
-        return si0+(-c-si0)*np.exp(-x/t1)
+        return si0 + (-c - si0) * np.exp(-x / t1)
+
     # calls the curve fitting routine using the function described above
     popt, pcov = curve_fit(t1ir, time, intensity, [si00, c0, t10])
     # def fun(x, t, y):# Defines minimization of T1 for least squares (It's not needed since curve_fit also uses least sq)
@@ -1195,8 +1204,8 @@ def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitt
     # res = least_squares(fun, x0 = popt, args = (time, intensity)) # Do least squares minimization
     xdata = np.linspace(min(time), max(time), spaceNo)
     ydata = t1ir(xdata, *popt)
-    rmsd = np.sqrt(((np.array(intensity)-np.array(t1ir(time, *popt)))**2).mean())
-    return{
+    rmsd = np.sqrt(((np.array(intensity) - np.array(t1ir(time, *popt))) ** 2).mean())
+    return {
         'xdata': xdata,
         'ydata': ydata,
         'evalY': t1ir(time, *popt),
@@ -1207,10 +1216,11 @@ def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitt
     }
 
 
-def fit_enhancement(dnpEnh):
+def fit_enhancement(power, enhancement):
     def func(x, a, b, c, d):
         return a * np.exp(-b * x ** c) + d
-    popt, pcov = curve_fit(func, power, enhancement)
+
+    popt, pcov = curve_fit(func, power, enhancement, maxfev = 10000)
     eMax = func(np.inf, *popt)
     eP = 1 - (1 - eMax) / 2
     sd = 0  # square deviation
@@ -1220,11 +1230,32 @@ def fit_enhancement(dnpEnh):
     xdata = np.linspace(min(power), max(power), 50000)
     ydata = func(xdata, *popt)
     eHalf = min(abs(ydata - eP))
-    pHalf = np.asarray(zip(xdata, ydata))[abs(ydata - eP) == eHalf][0][0]
+    pHalf = np.asarray(list(zip(xdata, ydata)))[abs(ydata - eP) == eHalf][0][0]
+    return {
+        'rmsd': rmsd,
+        'xdata': xdata,
+        'ydata': ydata,
+        'eHalf': eHalf,
+        'pHalf': pHalf,
+        'eMax': eMax,
+        'eP': eP,
+        'enhancementFormula': r"$E(P) = {:5.2f}exp({:+5.2f} P^{{{:5.2f}}}) {:+5.2f}$, RMSD = {:5.2f}".
+            format(*popt, rmsd),
+        'annotation': r"$S_{{rel}}(P) = \frac{{P/{:5.2f}}}{{1+P/{:5.2f}}}$"+'\n'+r'$E_{{max}} = {:5.2f}$'.format(pHalf, pHalf, func(np.inf, *popt)),
+    }
 
-    
-def fit_t1_series(power, t1, t1error):
-    p, v = np.polyfit(np.asarray(power), np.asarray(t1), 1, w=1/np.asarray(t1error))
+def k_sigma_calc(power, enhancement, t1SeriesFunc, t1SeriesFit):
+    kSigmaUncorr = [((1-enhancement[i])*.0152/t1SeriesFunc(power[0])) for i in range(len(power))]
+    kSigmaCorr = [((1-enhancement[i])*.0152/t1SeriesFunc(power[i])) for i in range(len(power))]
+    return(kSigmaCorr, kSigmaUncorr)
+
+
+def fit_t1_series(power, t1, t1error=0, degree=1):
+    coefs = np.polyfit(np.asarray(power), np.asarray(t1), degree, w=1 / np.asarray(t1error))
+    fit = np.poly1d(coefs)
     # line = slope*power+intercept
     # rmsd = np.sqrt(((np.array(t1)-np.array(line))**2).mean())
-    return p, v
+    return {
+        'fit': fit,
+        'coefs': coefs,
+    }
