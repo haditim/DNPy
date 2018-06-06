@@ -40,6 +40,7 @@ class NMRData(object):
             hiper_skip_header=3,
             endianess="<",
             autoPhase=True,
+            ph=0,
             **kwargs
     ):
         """ This reads the data """
@@ -52,7 +53,8 @@ class NMRData(object):
         self.rSt1 = kwargs.get('rSt1', self.rS)
         self.basCor = kwargs.get('basCor', True)
         self.offCor = kwargs.get('offCor', True)
-        self.autoPhase = kwargs.get('autoPhase', True)
+        self.autoPhase = autoPhase
+        self.ph = ph
         self.ftWindow = kwargs.get('ftWindow', 200)
         self.maxWin = kwargs.get('maxWin', 1000)
         self.t1Calc = kwargs.get('t1Calc', 'PCmagn')
@@ -773,11 +775,12 @@ def fwhm(x, y):
     return linewidth
 
 
-def return_exps(odnpPath, powerFile='', **kwargs):
+def return_exps(path, **kwargs):
     debug = kwargs.get('debug', False)
+    powerFile = kwargs.get('powerFile', '')
     phase = kwargs.get('phase', 'first')
     plotExts = kwargs.get('plotExts', [])
-    filesInDir = os.listdir(odnpPath)
+    filesInDir = os.listdir(path)
     dirs = []
     results = []
     dnpEnh = []  # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
@@ -794,8 +797,8 @@ def return_exps(odnpPath, powerFile='', **kwargs):
                 print('{} not NMR experiment({}).'.format(name, e))
     dirs.sort()
     # Taking care of powers csv file
-    if powerFile and os.path.isfile(odnpPath + '/' + powerFile + '.csv'):  # This is a csv file
-        openfile = open(odnpPath + '/' + powerFile + '.csv', 'r')
+    if powerFile and os.path.isfile(path + '/' + powerFile + '.csv'):  # This is a csv file
+        openfile = open(path + '/' + powerFile + '.csv', 'r')
         lines = openfile.readlines()
         if len(lines) == 1:
             lines = lines[0].split('\r')
@@ -820,11 +823,11 @@ def return_exps(odnpPath, powerFile='', **kwargs):
     for i, name in enumerate(dirs):
         try:
             if (phase == 'first' and i == 0) or phase == 'all':
-                result = NMRData(os.path.join(odnpPath, str(name).split('.')[0]),
+                result = NMRData(os.path.join(path, str(name).split('.')[0]),
                                  "TopSpin", autoPhase=True, ph=0, **kwargs)
                 ph = result.ph
             else:
-                result = NMRData(os.path.join(odnpPath, str(name).split('.')[0]),
+                result = NMRData(os.path.join(path, str(name).split('.')[0]),
                                  "TopSpin", autoPhase=False, ph=ph, **kwargs)
         except Exception as e:
             print("Problem adding exp ", name, ". The error is: ", e)
@@ -908,13 +911,29 @@ def return_exps(odnpPath, powerFile='', **kwargs):
             result.title, result.expType, result.powerMw / 1000))
         results.append(result)
     if plotExts:
-        print('Plotting figures...')
-        make_figures(results, path=odnpPath, dnpEnh=np.asarray(dnpEnh), t1Series=np.asarray(t1Series), **kwargs)
+        print(r"Fitting enhancement, $T_1$ series and $k_{sigma}$")
+        dnpEnh = np.asarray(dnpEnh)
+        t1Series = np.asarray(t1Series)
+        enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
+        t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4])
+        kSigmaFit = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
+        kwargs['dnpEnh'] = dnpEnh
+        kwargs['t1Series'] = t1Series
+        kwargs['enhancementFit'] = enhancementFit
+        kwargs['t1FitSeries'] = t1FitSeries
+        kwargs['kSigmaFit'] = kSigmaFit
+        print('Plotting evaluation figures...')
+        make_figures(results, path=path, **kwargs)
     return results
 
 
-def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
+def make_figures(results, path='', **kwargs):
     """ Makes figures for ODNP experiment """
+    dnpEnh = kwargs.get('dnpEnh', [])
+    t1Series = kwargs.get('t1Series', [])
+    enhancementFit = kwargs.get('enhancementFit', {})
+    t1FitSeries = kwargs.get('t1FitSeries', {})
+    kSigmaFit = kwargs.get('kSigmaFit', {})
     ftWindow = kwargs.get('ftWindow', 200)
     evalPath = kwargs.get('evalPath', 'eval')
     plotDpi = kwargs.get('plotDpi', 250)
@@ -1112,7 +1131,6 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
             plt.close(figure)
     # DNP figures
     # DNP enhancement
-    #enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
     ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7] == 1][:, 6], 'bo', marker="o", label='forward magn.')
     ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7] == 0][:, 6], 'ro', marker="o", label='backward magn')
     ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7] == 1][:, 4], 'bo', marker="x", label='forward real')
@@ -1128,8 +1146,8 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
                          xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
                          xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) - min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
                          va='center', ha='right', size=9, color='red', alpha=0.6)
-    #ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], label='(magn.) '+enhancementFit['enhancementFormula'])
-    #ax6.annotate(enhancementFit['annotation'], xy=(0.4, 0.5), xycoords='axes fraction')
+    ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--', label='(magn.) '+enhancementFit['enhancementFormula'])
+    ax6.annotate(enhancementFit['annotation'], xy=(0.4, 0.5), xycoords='axes fraction')
     ax6.set_title('Normalized DNP enhancement')
     ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
     ax6.set_xlabel('Power (mW)')
@@ -1166,14 +1184,10 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
     [fig6.savefig(os.path.join(path, evalPath, ('normalized_ODNP_enhancement.' + x)), dpi=plotDpi)
      for x in plotExts]
     #  dumpAllToCSV(path, evalPath, dnpEnh)
-    print("done")
-    print("Showing plot ... Please find its window and close when you are finished to continue.")
     plt.close(figure)
     # Main T1 figure
     figure = plt.figure(figsize=figSize)
     # Generated linear fit
-    t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4])
-    kSigma = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
     plt.errorbar(t1Series[:, 1], t1Series[:, 3], yerr=t1Series[:, 4],
                  fmt='+', capthick=2, capsize=2, label=r'$T_1$ experiments')
     plt.plot(t1Series[:, 1], t1Series[:, 1] * t1FitSeries['coefs'][0] + t1FitSeries['coefs'][1], '--k',
@@ -1189,6 +1203,17 @@ def make_figures(results, path='', dnpEnh=[], t1Series=[], **kwargs):
     figure.tight_layout()
     plt.legend()
     [plt.savefig(os.path.join(path, evalPath, ('T1_time_series.' + x)), dpi=plotDpi)
+     for x in plotExts]
+    plt.close(figure)
+    figure = plt.figure(figsize=figSize)
+    plt.plot(dnpEnh[:,1],kSigmaFit['kSigmaCor'], 'o', c='green', label ='cor')
+    plt.plot(dnpEnh[:,1],kSigmaFit['kSigmaUncor'], 'o', c='yellow', label ='uncor')
+    plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataCor'], '--', c='green', label=kSigmaFit['corFormula'])
+    plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataUncor'], '--', c='yellow', label =kSigmaFit['uncorFormula'])
+    plt.xlabel('Power (mW)')
+    plt.ylabel(r'$k_{sigma}s(P)C$  $(\frac{{1}}{{s}})$')
+    plt.legend()
+    [plt.savefig(os.path.join(path, evalPath, ('kSigma.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(figure)
 
@@ -1241,13 +1266,38 @@ def fit_enhancement(power, enhancement):
         'eP': eP,
         'enhancementFormula': r"$E(P) = {:5.2f}exp({:+5.2f} P^{{{:5.2f}}}) {:+5.2f}$, RMSD = {:5.2f}".
             format(*popt, rmsd),
-        'annotation': r"$S_{{rel}}(P) = \frac{{P/{:5.2f}}}{{1+P/{:5.2f}}}$"+'\n'+r'$E_{{max}} = {:5.2f}$'.format(pHalf, pHalf, func(np.inf, *popt)),
+        'annotation': r"$S_{{rel}}(P) = \frac{{P / {:5.2f} }}{{1+P / {:5.2f} }}$"
+                      "\n"
+                      r"$E_{{max}} = {:5.2f}$".format(pHalf, pHalf, func(np.inf, *popt)),
     }
 
-def k_sigma_calc(power, enhancement, t1SeriesFunc, t1SeriesFit):
-    kSigmaUncorr = [((1-enhancement[i])*.0152/t1SeriesFunc(power[0])) for i in range(len(power))]
-    kSigmaCorr = [((1-enhancement[i])*.0152/t1SeriesFunc(power[i])) for i in range(len(power))]
-    return(kSigmaCorr, kSigmaUncorr)
+def k_sigma_calc(power, enhancement, t1SeriesFunc, t1SeriesFit, spaceNo=500):
+    kSigmaUncor = [((1-enhancement[i])*.00152/t1SeriesFunc(power[0])) for i in range(len(power))]
+    kSigmaCor = [((1-enhancement[i])*.00152/t1SeriesFunc(power[i])) for i in range(len(power))]
+    def func(x, a, b):
+        return a * x / (b + x)
+    poptCor, pcovCor = curve_fit(func, power, kSigmaCor, maxfev=10000)
+    poptUncor, pcovUncor = curve_fit(func, power, kSigmaUncor, maxfev=10000)
+    kSigmaSmaxCor = func(10e100, *poptCor)
+    kSigmaSmaxUncor = func(10e100, *poptUncor)
+    xdata = np.linspace(min(power), max(power), spaceNo)
+    return{
+        'kSigmaCor': kSigmaCor,
+        'kSigmaUncor': kSigmaUncor,
+        'fitCor': lambda x: func(x,*poptCor),
+        'fitUncor': lambda x: func(x,*poptUncor),
+        'xdata': xdata,
+        'ydataCor': func(xdata,*poptCor),
+        'ydataUncor': func(xdata,*poptUncor),
+        'kSigmaSmaxCor': kSigmaSmaxCor,
+        'kSigmaSmaxUncor': kSigmaSmaxUncor,
+        'corFormula': r'$k_{{\sigma}}s(P)C = \frac{{{:.2e}\times P}}{{{:.2f}+P}}$'
+                      '\n'
+                      r'$k_{{\sigma}}s_{{max}}C = {:,.2e}$ $(\frac{{1}}{{s}})$'.format(*poptCor, kSigmaSmaxCor),
+        'uncorFormula': r'$k_{{\sigma}}s(P)C = \frac{{{:.2e}\times P}}{{{:.2f}+P}}$'
+                        '\n'
+                        r'$k_{{\sigma}}s_{{max}}C = {:,.2e}$ $(\frac{{1}}{{s}})$'.format(*poptUncor, kSigmaSmaxUncor),
+    }
 
 
 def fit_t1_series(power, t1, t1error=0, degree=1):
