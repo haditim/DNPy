@@ -47,3 +47,8 @@ kwargs = {
 - ~debug~ boolean turns verbose evaluation on and gives you more information.
 - ~plotExts~ denotes the plot file extensions you want to have saved.
 
+Finally, we call the main function using:
+#+BEGIN_SRC python
+exps = return_exps(path, **kwargs) 
+#+END_SRC
+
