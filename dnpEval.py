@@ -26,6 +26,7 @@ kwargs = {
     'figSize': (13, 8),
     'powerFile': powerFile,
     't1SeriesEval': True,
+    't1SeriesPolDeg': 1,  # Polynomial degree for T1 series fit (default = 1)
     'kSigmaCalc': True,
     }
 

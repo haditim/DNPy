@@ -930,7 +930,8 @@ def return_exps(path, **kwargs):
                 print(r"Fitting T1 series")
                 t1Series = np.asarray(t1Series)
                 kwargs['t1Series'] = t1Series
-                t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4])
+                t1SeriesPolDeg = kwargs.get('t1SeriesPolDeg', 1)
+                t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
                 kwargs['t1FitSeries'] = t1FitSeries
         if kSigmaCalc:
             print(r"Fitting kSigma")
@@ -1208,9 +1209,8 @@ def make_figures(results, path='', **kwargs):
         # Generated linear fit
         plt.errorbar(t1Series[:, 1], t1Series[:, 3], yerr=t1Series[:, 4],
                      fmt='+', capthick=2, capsize=2, label=r'$T_1$ experiments')
-        plt.plot(t1Series[:, 1], t1Series[:, 1] * t1FitSeries['coefs'][0] + t1FitSeries['coefs'][1], '--k',
-                 label=r'fit: $T_1(p)={{{:.4f}}}\times p+{{{:.2f}}}$'.format(
-                     t1FitSeries['coefs'][0], t1FitSeries['coefs'][1]))
+        plt.plot(t1FitSeries['xdata'], t1FitSeries['ydata'], '--k',
+                 label=t1FitSeries['fitFormula'])
         for i in range(0, len(t1Series[:, 0])):
             plt.annotate('exp {:d}'.format(int(t1Series[i, 0])),
                          xy=(t1Series[i, 1], t1Series[i, 3]),
@@ -1294,9 +1294,11 @@ def fit_enhancement(power, enhancement):
                       r"$E_{{max}} = {:5.2f}$".format(pHalf, pHalf, func(np.inf, *popt)),
     }
 
+
 def k_sigma_calc(power, enhancement, t1SeriesFunc, t1SeriesFit, spaceNo=500):
     kSigmaUncor = [((1-enhancement[i])*.00152/t1SeriesFunc(power[0])) for i in range(len(power))]
     kSigmaCor = [((1-enhancement[i])*.00152/t1SeriesFunc(power[i])) for i in range(len(power))]
+
     def func(x, a, b):
         return a * x / (b + x)
     poptCor, pcovCor = curve_fit(func, power, kSigmaCor, maxfev=10000)
@@ -1323,12 +1325,25 @@ def k_sigma_calc(power, enhancement, t1SeriesFunc, t1SeriesFit, spaceNo=500):
     }
 
 
-def fit_t1_series(power, t1, t1error=0, degree=1):
+def fit_t1_series(power, t1, t1error=0, degree=1, spaceNo=500):
     coefs = np.polyfit(np.asarray(power), np.asarray(t1), degree, w=1 / np.asarray(t1error))
     fit = np.poly1d(coefs)
+    xdata = np.linspace(min(power), max(power), spaceNo)
+    ydata = fit(xdata)
+    fitFormula = ''
+    for i, coeff in enumerate(coefs):
+        if i < len(coefs) - 2:
+            fitFormula += r'${:+.1e}P^{:d}$'.format(coeff, len(coefs) - i - 1)
+        elif i < len(coefs) - 1:
+            fitFormula += r'${:+.1e}P$'.format(coeff)
+        else:
+            fitFormula += r'${:+.2f}$'.format(coeff)
     # line = slope*power+intercept
     # rmsd = np.sqrt(((np.array(t1)-np.array(line))**2).mean())
     return {
         'fit': fit,
         'coefs': coefs,
+        'xdata': xdata,
+        'ydata': ydata,
+        'fitFormula': fitFormula,
     }

@@ -14,7 +14,7 @@
 [[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/fc/70/fc70ac2e-146d-483a-a910-e2342f56bab7/t1.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
  - T1 power series
 #+attr_html: :width 90%
-[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/77/cb/77cbe6d4-f806-426d-ba61-aa91994ab3c3/t1_time_series.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
+[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/77/cb/77cbe6d4-f806-426d-ba61-aa91994ab3c3/t1_time_series.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]y
 
 
 * Usage
@@ -32,8 +32,8 @@ python3 dnpEval.py
 
 A sample usage is implemented in ~dnpEval.py~. You need to set the following variables in your dnpEval:
 #+BEGIN_SRC python
-path = ''
-powerFile = 'powerBU'  
+path = '/path/to/exp/folder/'
+powerFile = 'powers'
 kwargs = {
     't1Calc': 'PCreal',  # 'PCreal' for real phase cycled channel or 'PCmagn' or 'real' or 'magn'
     'phase': 'first',  # all, none, first
@@ -54,6 +54,9 @@ kwargs = {
     'dumpToCsv': True,
     'figSize': (13, 8),
     'powerFile': powerFile,
+    't1SeriesEval': True,
+    't1SeriesPolDeg': 1,  # Polynomial degree for T1 series fit (default = 1)
+    'kSigmaCalc': True,
     }
 
 #+END_SRC
