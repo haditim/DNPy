@@ -927,7 +927,7 @@ def return_exps(path, **kwargs):
                 kSigmaCalc = False
                 kwargs['kSigmaCalc'] = False
             else:
-                print(r"Fitting T1 series and $k_{sigma}$")
+                print(r"Fitting T1 series")
                 t1Series = np.asarray(t1Series)
                 kwargs['t1Series'] = t1Series
                 t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4])
@@ -1232,8 +1232,8 @@ def make_figures(results, path='', **kwargs):
         plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataCor'], '--', c='green', label=kSigmaFit['corFormula'])
         plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataUncor'], '--', c='red', label =kSigmaFit['uncorFormula'])
         plt.xlabel('Power (mW)')
-        plt.ylabel(r'$k_{sigma}s(P)C$  $(\frac{{1}}{{s}})$')
-        plt.title(r'$k_{{sigma}}$ calculations')
+        plt.ylabel(r'$k_{\sigma}s(P)C$  $(\frac{1}{s})$')
+        plt.title(r'$k_{\sigma}$ calculations')
         plt.legend()
         figure.tight_layout()
         [plt.savefig(os.path.join(path, evalPath, ('kSigma.' + x)), dpi=plotDpi)
