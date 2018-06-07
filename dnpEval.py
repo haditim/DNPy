@@ -3,8 +3,8 @@ from typing import List
 from functions import *
 from functions import NMRData
 
-path = '/mnt/EPR-HADI/HADI/Data/ODNP/Tests/20180528_H2O_07TubeNew_NewLongFixedCoil/'
-powerFile = 'powerBU'
+path = '/mnt/EPR-HADI/HADI/Data/ODNP/Tests/20170705_H2O_CWODNP_waitTtest/'
+powerFile = 'powers'
 kwargs = {
     't1Calc': 'PCreal',  # 'PCreal' for real phase cycled channel or 'PCmagn' or 'real' or 'magn'
     'phase': 'first',  # all, none, first
@@ -25,6 +25,8 @@ kwargs = {
     'dumpToCsv': True,
     'figSize': (13, 8),
     'powerFile': powerFile,
+    't1SeriesEval': True,
+    'kSigmaCalc': True,
     }
 
 if __name__ == '__main__':

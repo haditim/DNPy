@@ -773,6 +773,9 @@ def return_exps(path, **kwargs):
     powerFile = kwargs.get('powerFile', '')
     phase = kwargs.get('phase', 'first')
     plotExts = kwargs.get('plotExts', [])
+    process = kwargs.get('process', True)
+    t1SeriesEval = kwargs.get('t1SeriesEval', True)
+    kSigmaCalc = kwargs.get('kSigmaCalc', True)
     filesInDir = os.listdir(path)
     dirs = []
     results = []
@@ -790,12 +793,19 @@ def return_exps(path, **kwargs):
                 print('{} not NMR experiment({}).'.format(name, e))
     dirs.sort()
     # Taking care of powers csv file
-    if powerFile and os.path.isfile(path + '/' + powerFile + '.csv'):  # This is a csv file
-        openfile = open(path + '/' + powerFile + '.csv', 'r')
+    if powerFile:
+        try:
+            openfile = open(path + '/' + powerFile + '.csv', 'r')
+        except:
+            openfile = open(path + '/' + powerFile, 'r')
         lines = openfile.readlines()
         if len(lines) == 1:
             lines = lines[0].split('\r')
         if len(lines[0].split('\r')[0].split(',')) == 2 and 'time' in lines[0]:
+            print('This code is not compatible with "time, power" power logging.'
+                  '\nYou should have "time, dBm" or "dB, dBm" csv file.\n'
+                  'I continue evaluation but probably the output will not be usable.')
+        elif len(lines[0].split('\r')[0].split(',')) == 2:
             lines.pop(0)
             for line in lines:
                 att, power = line.split('\r')[0].split(',')
@@ -903,18 +913,30 @@ def return_exps(path, **kwargs):
         print("Evaluated {}\t of type {}\t @{:.3f} W".format(
             result.title, result.expType, result.powerMw / 1000))
         results.append(result)
-    if plotExts:
-        print(r"Fitting enhancement, $T_1$ series and $k_{sigma}$")
+    if process:
+        print(r"Fitting enhancement")
         dnpEnh = np.asarray(dnpEnh)
-        t1Series = np.asarray(t1Series)
         enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
-        t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4])
-        kSigmaFit = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
         kwargs['dnpEnh'] = dnpEnh
-        kwargs['t1Series'] = t1Series
         kwargs['enhancementFit'] = enhancementFit
-        kwargs['t1FitSeries'] = t1FitSeries
-        kwargs['kSigmaFit'] = kSigmaFit
+        if t1SeriesEval:
+            if not t1Series:
+                print('Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
+                t1SeriesEval = False
+                kwargs['t1SeriesEval'] = False
+                kSigmaCalc = False
+                kwargs['kSigmaCalc'] = False
+            else:
+                print(r"Fitting T1 series and $k_{sigma}$")
+                t1Series = np.asarray(t1Series)
+                kwargs['t1Series'] = t1Series
+                t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4])
+                kwargs['t1FitSeries'] = t1FitSeries
+        if kSigmaCalc:
+            print(r"Fitting kSigma")
+            kSigmaFit = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
+            kwargs['kSigmaFit'] = kSigmaFit
+    if plotExts:
         print('Plotting evaluation figures...')
         make_figures(results, path=path, **kwargs)
     return results
@@ -932,6 +954,8 @@ def make_figures(results, path='', **kwargs):
     plotDpi = kwargs.get('plotDpi', 250)
     figSize = kwargs.get('figSize', (12, 8))
     plotExts = kwargs.get('plotExts', ['jpg'])
+    t1SeriesEval = kwargs.get('t1SeriesEval', True)
+    kSigmaCalc = kwargs.get('kSigmaCalc', True)
     try:  # Taking care of evaluation dir
         os.mkdir(os.path.join(path, evalPath))
     except Exception as e:
@@ -980,7 +1004,7 @@ def make_figures(results, path='', **kwargs):
                 value.allFid[0][0]), label='real')
             plt.plot(value.fidTimeHistory['bLeftShift'], np.imag(
                 value.allFid[0][0]), label='imag')
-            plt.title('FID at {} dBm and {:.2f} mW power'.format(value.powerDbm, value.powerMw))
+            plt.title('FID at {:+.1f} dBm and {:.2f} mW power'.format(value.powerDbm, value.powerMw))
             plt.xlabel('time (ms)')
             plt.ylabel('Signal (a.u.)')
             plt.tight_layout()
@@ -989,14 +1013,14 @@ def make_figures(results, path='', **kwargs):
              for x in plotExts]
             plt.close(figure)
             ax0.plot(value.fidTimeHistory['bLeftShift'], np.real(value.allFid[0][0]), label=(
-                '{} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # original
+                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # original
             ax1.plot(value.fidTimeHistory['bZeroFilling'], np.real(value.allFid[1][0]), label=(
-                '{} dBm\t{:.2f} mW power'.format(value.powerDbm,
+                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm,
                                                  value.powerMw)).expandtabs())  # after left and right shift and baselineCorrection
             ax2.plot(value.fidTime, np.real(value.allFid[2][0]), label=(
-                '{} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # after zero filling
+                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # after zero filling
             ax3.plot(value.fidTime, np.real(value.allFid[3][0]), label=(
-                '{} dBm\t{:.2f} mW power'.format(value.powerDbm,
+                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm,
                                                  value.powerMw)).expandtabs())  # after exponential windowing
             # FT plots
             figure = plt.figure(figsize=figSize)
@@ -1006,7 +1030,7 @@ def make_figures(results, path='', **kwargs):
                 value.allFid[5][0]), label='imag.')
             plt.plot(value.frequency, np.abs(
                 value.allFid[5][0]), label='abs.')
-            plt.title('{} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
+            plt.title('{:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
                 value.powerDbm, value.powerMw, value.ph))
             plt.xlabel('Frequency (Hz)')
             plt.ylabel('Intensity (a.u.)')
@@ -1018,7 +1042,7 @@ def make_figures(results, path='', **kwargs):
              for x in plotExts]
             plt.close(figure)
             ax4.plot(value.frequency, np.real(value.allFid[5][0]), label=(
-                '{} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())
+                '{:.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())
             ax4.set_title('FT after phasing to %.0f degrees' % value.ph)
             ax4.grid(True)
             ax4.set_xlim(value.maxFreq - value.ftWindow,
@@ -1178,37 +1202,43 @@ def make_figures(results, path='', **kwargs):
      for x in plotExts]
     #  dumpAllToCSV(path, evalPath, dnpEnh)
     plt.close(figure)
-    # Main T1 figure
-    figure = plt.figure(figsize=figSize)
-    # Generated linear fit
-    plt.errorbar(t1Series[:, 1], t1Series[:, 3], yerr=t1Series[:, 4],
-                 fmt='+', capthick=2, capsize=2, label=r'$T_1$ experiments')
-    plt.plot(t1Series[:, 1], t1Series[:, 1] * t1FitSeries['coefs'][0] + t1FitSeries['coefs'][1], '--k',
-             label=r'fit: $T_1(p)={{{:.4f}}}\times p+{{{:.2f}}}$'.format(
-                 t1FitSeries['coefs'][0], t1FitSeries['coefs'][1]))
-    for i in range(0, len(t1Series[:, 0])):
-        plt.annotate('exp {:d}'.format(int(t1Series[i, 0])),
-                     xy=(t1Series[i, 1], t1Series[i, 3]),
-                     xytext=(t1Series[i, 1] + (max(t1Series[:, 1]) - min(t1Series[:, 1])) / 40, t1Series[i, 3]),
-                     va='center', ha='left', size=9, color='blue', alpha=0.6)
-    plt.xlabel('Power (mW)')
-    plt.ylabel('Time (s)')
-    figure.tight_layout()
-    plt.legend()
-    [plt.savefig(os.path.join(path, evalPath, ('T1_time_series.' + x)), dpi=plotDpi)
-     for x in plotExts]
-    plt.close(figure)
-    figure = plt.figure(figsize=figSize)
-    plt.plot(dnpEnh[:,1],kSigmaFit['kSigmaCor'], 'o', c='green', label ='cor')
-    plt.plot(dnpEnh[:,1],kSigmaFit['kSigmaUncor'], 'o', c='red', label ='uncor')
-    plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataCor'], '--', c='green', label=kSigmaFit['corFormula'])
-    plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataUncor'], '--', c='red', label =kSigmaFit['uncorFormula'])
-    plt.xlabel('Power (mW)')
-    plt.ylabel(r'$k_{sigma}s(P)C$  $(\frac{{1}}{{s}})$')
-    plt.legend()
-    [plt.savefig(os.path.join(path, evalPath, ('kSigma.' + x)), dpi=plotDpi)
-     for x in plotExts]
-    plt.close(figure)
+    if t1SeriesEval:
+        # Main T1 figure
+        figure = plt.figure(figsize=figSize)
+        # Generated linear fit
+        plt.errorbar(t1Series[:, 1], t1Series[:, 3], yerr=t1Series[:, 4],
+                     fmt='+', capthick=2, capsize=2, label=r'$T_1$ experiments')
+        plt.plot(t1Series[:, 1], t1Series[:, 1] * t1FitSeries['coefs'][0] + t1FitSeries['coefs'][1], '--k',
+                 label=r'fit: $T_1(p)={{{:.4f}}}\times p+{{{:.2f}}}$'.format(
+                     t1FitSeries['coefs'][0], t1FitSeries['coefs'][1]))
+        for i in range(0, len(t1Series[:, 0])):
+            plt.annotate('exp {:d}'.format(int(t1Series[i, 0])),
+                         xy=(t1Series[i, 1], t1Series[i, 3]),
+                         xytext=(t1Series[i, 1] + (max(t1Series[:, 1]) - min(t1Series[:, 1])) / 40, t1Series[i, 3]),
+                         va='center', ha='left', size=9, color='blue', alpha=0.6)
+        plt.xlabel('Power (mW)')
+        plt.ylabel('Time (s)')
+        plt.title(r'$T_1$ series')
+        plt.legend()
+        figure.tight_layout()
+        [plt.savefig(os.path.join(path, evalPath, ('T1_time_series.' + x)), dpi=plotDpi)
+         for x in plotExts]
+        plt.close(figure)
+    if kSigmaCalc:
+        # kSigma figure
+        figure = plt.figure(figsize=figSize)
+        plt.plot(dnpEnh[:,1],kSigmaFit['kSigmaCor'], 'o', c='green', label ='cor')
+        plt.plot(dnpEnh[:,1],kSigmaFit['kSigmaUncor'], 'o', c='red', label ='uncor')
+        plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataCor'], '--', c='green', label=kSigmaFit['corFormula'])
+        plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataUncor'], '--', c='red', label =kSigmaFit['uncorFormula'])
+        plt.xlabel('Power (mW)')
+        plt.ylabel(r'$k_{sigma}s(P)C$  $(\frac{{1}}{{s}})$')
+        plt.title(r'$k_{{sigma}}$ calculations')
+        plt.legend()
+        figure.tight_layout()
+        [plt.savefig(os.path.join(path, evalPath, ('kSigma.' + x)), dpi=plotDpi)
+         for x in plotExts]
+        plt.close(figure)
 
 
 def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitting
