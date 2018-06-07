@@ -2,6 +2,19 @@
 
   *DNPy* is a Python code package to evaluate continuous wave (CW) Overhauser dynamic nuclear polarization (ODNP) experiments. DNPy has taken the core functionality from [[https://github.com/bennomeier/pyNMR][pyNMR]].
 
+* Sample output
+ - kSigma:
+#+attr_html: :width 90%
+[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/3f/27/3f278115-526f-4c4c-8d4d-cc14787481ae/ksigma.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
+ - ODNP enhancement
+#+attr_html: :width 90%
+[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/f8/d2/f8d2a08b-34a3-490c-acf5-d8f070efce85/normalized_odnp_enhancement.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
+ - T1 inversion recovery fit
+http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/f8/d2/f8d2a08b-34a3-490c-acf5-d8f070efce85/normalized_odnp_enhancement.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg
+#+attr_html: :width 90%
+[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/fc/70/fc70ac2e-146d-483a-a910-e2342f56bab7/t1.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
+
+
 * Usage
   You need to have python3 with following packages installed:
 - Numpy
