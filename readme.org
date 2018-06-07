@@ -13,8 +13,8 @@
 #+attr_html: :width 90%
 [[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/fc/70/fc70ac2e-146d-483a-a910-e2342f56bab7/t1.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
  - T1 power series
-[[#+attr_html: :width 90%
-file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/77/cb/77cbe6d4-f806-426d-ba61-aa91994ab3c3/t1_time_series.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
+#+attr_html: :width 90%
+[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/77/cb/77cbe6d4-f806-426d-ba61-aa91994ab3c3/t1_time_series.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
 
 
 * Usage
