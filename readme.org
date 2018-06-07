@@ -1,1 +1,49 @@
-*DNPy* is a Python code package to evaluate continuous wave (CW) Overhauser dynamic nuclear polarization (ODNP) experiments. DNPy has taken the core functionality from [[https://github.com/bennomeier/pyNMR][pyNMR]]. 
+* DNPy
+
+  *DNPy* is a Python code package to evaluate continuous wave (CW) Overhauser dynamic nuclear polarization (ODNP) experiments. DNPy has taken the core functionality from [[https://github.com/bennomeier/pyNMR][pyNMR]].
+
+* Usage
+  You need to have python3 with following packages installed:
+- Numpy
+  Install using ~pip3 install --user numpy~ or ~sudo apt install python3-numpy~ on linux.
+- Scipy
+  Install using ~pip3 install --user scipy~ or ~sudo apt install python3-scipy~ on linux.
+
+You can install [[https://www.anaconda.com/download/][ANCONDA]] for windows to have all necessary packages installed.
+Then DNPy can be run with the following:
+#+BEGIN_SRC shell
+python3 dnpEval.py
+#+END_SRC
+
+A sample usage is implemented in ~dnpEval.py~. You need to set the following variables in your dnpEval:
+#+BEGIN_SRC python
+path = ''
+powerFile = 'powerBU'  
+kwargs = {
+    't1Calc': 'PCreal',  # 'PCreal' for real phase cycled channel or 'PCmagn' or 'real' or 'magn'
+    'phase': 'first',  # all, none, first
+    'ftWindow': 200,  # X domain for FT plot, int. and phase calculation
+    'maxWin': 1000,  # Does not allow peaks out of this domain to be calculated in int.
+    'lS': 70,  # Left shift points or 'auto'
+    'lSt1': 70,  # LS for t1 experiments (this differs from DNP sometimes)
+    'rS': 110,  # Right shidt points
+    'rSt1': 75,
+    'lB': 2,  # Line boradening [Hz]
+    'offCor': True,  # offset correctioon
+    'basCor': True,  # baseline correction
+    'evalPath': 'evalHadiTest',
+    'plotDpi': 250,  # plot file resolution
+    'plotExts': ['jpg'],  # remove all if you do not want plots to be saved
+    'process': True,
+    'debug': False,
+    'dumpToCsv': True,
+    'figSize': (13, 8),
+    'powerFile': powerFile,
+    }
+
+#+END_SRC
+- ~path~ defines the ODNP experiment root folder.
+- ~powerFile~ is used when you have "ODNP - set .. dB" style title in your experiments and is a csv file containing dB to dBm conversion table.
+- ~debug~ boolean turns verbose evaluation on and gives you more information.
+- ~plotExts~ denotes the plot file extensions you want to have saved.
+

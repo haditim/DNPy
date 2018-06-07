@@ -1,20 +1,13 @@
 # DNPy functions file
-from typing import List
-
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FormatStrFormatter
-
 from scipy import fft
 from scipy.fftpack import fftshift
-
-from scipy.optimize import curve_fit, least_squares
+from scipy.optimize import curve_fit
 from scipy import stats
 import os
 import os.path
-from scipy import stats
-from scipy import optimize
 from matplotlib import style
 
 style.use('seaborn-whitegrid')

@@ -6,7 +6,7 @@ from functions import NMRData
 path = '/mnt/EPR-HADI/HADI/Data/ODNP/Tests/20180528_H2O_07TubeNew_NewLongFixedCoil/'
 powerFile = 'powerBU'
 kwargs = {
-    't1Calc': 'PCreal',
+    't1Calc': 'PCreal',  # 'PCreal' for real phase cycled channel or 'PCmagn' or 'real' or 'magn'
     'phase': 'first',  # all, none, first
     'ftWindow': 200,  # X domain for FT plot, int. and phase calculation
     'maxWin': 1000,  # Does not allow peaks out of this domain to be calculated in int.
