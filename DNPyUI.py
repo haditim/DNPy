@@ -3,6 +3,10 @@ from PyQt5.QtWidgets import *
 import io
 import sys
 from functions import *
+import threading
+import time
+from contextlib import redirect_stdout
+import subprocess
 
 
 baseUIClass, baseUIWidget = uic.loadUiType("ui/DNPyUI.ui")
@@ -83,26 +87,28 @@ class AppWindow(baseUIWidget, baseUIClass):
             't1SeriesPolDeg': t1SeriesPolDeg,
             'kSigmaCalc': kSigmaCalc,
         }
+        stdout = sys.stdout
+        sys.stdout = io.StringIO()
+        thread = threading.Thread(target=return_exps, args=(path,), kwargs=kwargs)
+        thread.daemon = False  # Daemonize thread
+        thread.start()  # Start the execution
+        time.sleep(5)
+        output = sys.stdout.getvalue()
+        sys.stdout = stdout
+        print(output)
+        # stdout = sys.stdout
+        # sys.stdout = io.StringIO()
+        # exps = return_exps(path, **kwargs)
+        # output = sys.stdout.getvalue()
+        # sys.stdout = stdout
+        # print(output)
 
-    with Capturing() as output:
-        exps = return_exps(path, **kwargs)
-    print(output)
     def open_exp_path(self):
         self.path.setText(str(QFileDialog.getExistingDirectory(self, "Select Experiment Directory")))
     def open_exp_powers(self):
         self.powerFile.setText(str(QFileDialog.getOpenFileName(self, "Select Powers CSV File","","csv files (*.csv)")[0]))
 
 
-class Capturing(list):
-    def __enter__(self):
-        self._stdout = sys.stdout
-        sys.stdout = self._stringio = io.StringIO()
-        return self
-    
-    def __exit__(self, *args):
-        self.extend(self._stringio.getvalue().splitlines())
-        del self._stringio    # free up some memory
-        sys.stdout = self._stdout
 
 def main():
     app = QApplication(sys.argv)
