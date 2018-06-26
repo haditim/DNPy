@@ -951,8 +951,6 @@ def dumpAllToCSV(results, path, **kwargs):
     evalPath = kwargs.get('evalPath', 'eval')
     dnpEnh = kwargs.get('dnpEnh', [])
     t1Series = kwargs.get('t1Series', [])
-    enhancementFit = kwargs.get('enhancementFit', {})
-    t1FitSeries = kwargs.get('t1FitSeries', {})
     kSigmaFit = kwargs.get('kSigmaFit', {})
     evalPath = kwargs.get('evalPath', 'eval')
     t1SeriesEval = kwargs.get('t1SeriesEval', True)
