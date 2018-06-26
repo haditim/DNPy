@@ -776,6 +776,7 @@ def return_exps(path, **kwargs):
     process = kwargs.get('process', True)
     t1SeriesEval = kwargs.get('t1SeriesEval', True)
     kSigmaCalc = kwargs.get('kSigmaCalc', True)
+    dumpToCsv = kwargs.get('dumpToCsv', True)
     filesInDir = os.listdir(path)
     dirs = []
     results = []
@@ -940,7 +941,34 @@ def return_exps(path, **kwargs):
     if plotExts:
         print('Plotting evaluation figures...')
         make_figures(results, path=path, **kwargs)
+    if dumpToCsv:
+        print('Saving CSV files...')
+        dumpAllToCSV(results, path=path, **kwargs)
     return results
+
+
+def dumpAllToCSV(results, path, **kwargs):
+    evalPath = kwargs.get('evalPath', 'eval')
+    dnpEnh = kwargs.get('dnpEnh', [])
+    t1Series = kwargs.get('t1Series', [])
+    enhancementFit = kwargs.get('enhancementFit', {})
+    t1FitSeries = kwargs.get('t1FitSeries', {})
+    kSigmaFit = kwargs.get('kSigmaFit', {})
+    evalPath = kwargs.get('evalPath', 'eval')
+    t1SeriesEval = kwargs.get('t1SeriesEval', True)
+    kSigmaCalc = kwargs.get('kSigmaCalc', True)
+    # dnpEnh: expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
+    np.savetxt(os.path.join(path,evalPath,'enhancements.csv'), dnpEnh, delimiter='\t',
+               header=('expNum\tpowerMw\tpowerDbm\tintReal\tnormIntReal\tintMagn\tnormIntMagn\tforward'))
+    # t1Series expNum, powerMw, powerDbm, t1, t1error
+    if t1SeriesEval:
+        np.savetxt(os.path.join(path,evalPath,'t1series.csv'), t1Series, delimiter='\t',
+                   header=('expNum\tpowerMw\tpowerDbm\tt1\tt1error'))
+    if kSigmaCalc:
+        np.savetxt(os.path.join(path, evalPath, 'ksigma.csv'),
+                   np.asarray((dnpEnh[:,1],kSigmaFit['kSigmaCor'],kSigmaFit['kSigmaUncor'])).transpose(),
+                   delimiter='\t', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
+
 
 
 def make_figures(results, path='', **kwargs):

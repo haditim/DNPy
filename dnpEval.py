@@ -19,7 +19,7 @@ kwargs = {
     'basCor': True,  # baseline correction
     'evalPath': 'evalHadiTest',
     'plotDpi': 250,  # plot file resolution
-    'plotExts': ['jpg'],  # remove all if you do not want plots to be saved
+    'plotExts': [],  # remove all if you do not want plots to be saved
     'process': True,
     'debug': False,
     'dumpToCsv': True,
