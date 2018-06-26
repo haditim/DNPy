@@ -1,15 +1,40 @@
 from PyQt5 import uic
-from PyQt5.QtWidgets import *
+from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
 import io
 import sys
 from functions import *
 import threading
 import time
-from contextlib import redirect_stdout
-import subprocess
 
 
 baseUIClass, baseUIWidget = uic.loadUiType("ui/DNPyUI.ui")
+# baseUIClassResults, baseUIWidgetResults = uic.loadUiType("ui/DNPyResults.ui")
+
+
+class Ui_MainWindow(object):
+    def setupUi(self, MainWindow):
+        MainWindow.setObjectName("MainWindow")
+        MainWindow.resize(800, 600)
+        self.centralwidget = QtWidgets.QWidget(MainWindow)
+        self.centralwidget.setObjectName("centralwidget")
+        self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
+        self.gridLayout.setObjectName("gridLayout")
+        self.webView = QtWebEngineWidgets.QWebEngineView(self.centralwidget)
+        self.webView.setUrl(QtCore.QUrl("http://www.spintoolbox.com/"))
+        self.webView.setObjectName("webView")
+        self.gridLayout.addWidget(self.webView, 0, 0, 1, 1)
+        MainWindow.setCentralWidget(self.centralwidget)
+        self.statusbar = QtWidgets.QStatusBar(MainWindow)
+        self.statusbar.setObjectName("statusbar")
+        MainWindow.setStatusBar(self.statusbar)
+
+        self.retranslateUi(MainWindow)
+        QtCore.QMetaObject.connectSlotsByName(MainWindow)
+
+    def retranslateUi(self, MainWindow):
+        _translate = QtCore.QCoreApplication.translate
+        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+
 
 class AppWindow(baseUIWidget, baseUIClass):
     def __init__(self, *args, **kwargs):
@@ -87,14 +112,22 @@ class AppWindow(baseUIWidget, baseUIClass):
             't1SeriesPolDeg': t1SeriesPolDeg,
             'kSigmaCalc': kSigmaCalc,
         }
+        MainWindow = QtWidgets.QMainWindow()
+        ui = Ui_MainWindow()
+        ui.setupUi(MainWindow)
+        MainWindow.show()
         stdout = sys.stdout
         sys.stdout = io.StringIO()
+        # results = ResultWindow(self)
         thread = threading.Thread(target=return_exps, args=(path,), kwargs=kwargs)
         thread.daemon = False  # Daemonize thread
         thread.start()  # Start the execution
-        time.sleep(5)
+        self.job_done = self.connect(thread, SIGNAL("finished()"), self.done)
         output = sys.stdout.getvalue()
         sys.stdout = stdout
+        while True:
+            print(self.job_done)
+            time.sleep(1)
         print(output)
         # stdout = sys.stdout
         # sys.stdout = io.StringIO()
@@ -111,10 +144,11 @@ class AppWindow(baseUIWidget, baseUIClass):
 
 
 def main():
-    app = QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     w = AppWindow()
     w.show()
-    sys.exit(app.exec_())
+    app.exec_()
+    #sys.exit(app.exec_())
 
 
 if __name__ == '__main__':
