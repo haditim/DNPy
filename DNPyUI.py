@@ -1,39 +1,11 @@
 from PyQt5 import uic
 from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
-import io
 import sys
 from functions import *
-import threading
-import time
+import subprocess
 
 
 baseUIClass, baseUIWidget = uic.loadUiType("ui/DNPyUI.ui")
-# baseUIClassResults, baseUIWidgetResults = uic.loadUiType("ui/DNPyResults.ui")
-
-
-class Ui_MainWindow(object):
-    def setupUi(self, MainWindow):
-        MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(800, 600)
-        self.centralwidget = QtWidgets.QWidget(MainWindow)
-        self.centralwidget.setObjectName("centralwidget")
-        self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
-        self.gridLayout.setObjectName("gridLayout")
-        self.webView = QtWebEngineWidgets.QWebEngineView(self.centralwidget)
-        self.webView.setUrl(QtCore.QUrl("http://www.spintoolbox.com/"))
-        self.webView.setObjectName("webView")
-        self.gridLayout.addWidget(self.webView, 0, 0, 1, 1)
-        MainWindow.setCentralWidget(self.centralwidget)
-        self.statusbar = QtWidgets.QStatusBar(MainWindow)
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
-
-        self.retranslateUi(MainWindow)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
-
-    def retranslateUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
 
 
 class AppWindow(baseUIWidget, baseUIClass):
@@ -42,7 +14,11 @@ class AppWindow(baseUIWidget, baseUIClass):
         self.setupUi(self)
         self.pathButton.clicked.connect(self.open_exp_path)
         self.toolButton.clicked.connect(self.open_exp_powers)
-        self.buttonBox.accepted.connect(self.start)
+        self.cancelButton.clicked.connect(self.close)
+        self.startButton.clicked.connect(self.start)
+        sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
+
+
 
     def start(self):
         path = self.path.text()
@@ -112,43 +88,66 @@ class AppWindow(baseUIWidget, baseUIClass):
             't1SeriesPolDeg': t1SeriesPolDeg,
             'kSigmaCalc': kSigmaCalc,
         }
-        MainWindow = QtWidgets.QMainWindow()
-        ui = Ui_MainWindow()
-        ui.setupUi(MainWindow)
-        MainWindow.show()
-        stdout = sys.stdout
-        sys.stdout = io.StringIO()
-        # results = ResultWindow(self)
-        thread = threading.Thread(target=return_exps, args=(path,), kwargs=kwargs)
-        thread.daemon = False  # Daemonize thread
-        thread.start()  # Start the execution
-        self.job_done = self.connect(thread, SIGNAL("finished()"), self.done)
-        output = sys.stdout.getvalue()
-        sys.stdout = stdout
-        while True:
-            print(self.job_done)
-            time.sleep(1)
-        print(output)
-        # stdout = sys.stdout
-        # sys.stdout = io.StringIO()
-        # exps = return_exps(path, **kwargs)
-        # output = sys.stdout.getvalue()
-        # sys.stdout = stdout
-        # print(output)
+        self.generalGroup.setEnabled(False)
+        self.dnpGroup.setEnabled(False)
+        self.t1SeriesEval.setEnabled(False)
+        self.makeFigs.setEnabled(False)
+        self.resultsBrowser.setEnabled(True)
+        self.startButton.setEnabled(False)
+        self.cancelButton.setText("Abort")
+        self.dnpThread = Thread(path, kwargs)
+        self.dnpThread.dataReady.connect(self.onDataReady)
+        self.dnpThread.start()
+
+    def normalOutputWritten(self, text):
+        """Append text to the QTextEdit."""
+        # Maybe QTextEdit.append() works as well, but this is how I do it:
+        self.resultsBrowser.append(text)
+
+
 
     def open_exp_path(self):
         self.path.setText(str(QFileDialog.getExistingDirectory(self, "Select Experiment Directory")))
     def open_exp_powers(self):
         self.powerFile.setText(str(QFileDialog.getOpenFileName(self, "Select Powers CSV File","","csv files (*.csv)")[0]))
 
+    def onDataReady(self, exps):
+        self.exps = exps
+        self.cancelButton.setText("Close")
+        sys.stdout = sys.__stdout__
+        print(self.resultsBrowser.toPlainText())
+
+class Thread(QtCore.QThread):
+    dataReady = QtCore.pyqtSignal(list)
+    def __init__(self, path, kwargs):
+        super().__init__()
+        self.path = path
+        self.kwargs = kwargs
+
+    def stop(self):
+        self._flag = False
+
+    @QtCore.pyqtSlot(list)
+    def run(self):
+        self._flag = True
+        exps = return_exps(self.path, **self.kwargs)
+        self.dataReady.emit(exps)
 
 
+
+class EmittingStream(QtCore.QObject):
+
+    textWritten = QtCore.pyqtSignal(str)
+
+    def write(self, text):
+        self.textWritten.emit(str(text))
+
+        
 def main():
     app = QtWidgets.QApplication(sys.argv)
     w = AppWindow()
     w.show()
-    app.exec_()
-    #sys.exit(app.exec_())
+    sys.exit(app.exec_())
 
 
 if __name__ == '__main__':

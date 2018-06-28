@@ -776,6 +776,7 @@ def return_exps(path, **kwargs):
     process = kwargs.get('process', True)
     t1SeriesEval = kwargs.get('t1SeriesEval', True)
     kSigmaCalc = kwargs.get('kSigmaCalc', True)
+    path = str(path)
     filesInDir = os.listdir(path)
     dirs = []
     results = []
@@ -933,13 +934,14 @@ def return_exps(path, **kwargs):
                 t1SeriesPolDeg = kwargs.get('t1SeriesPolDeg', 1)
                 t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
                 kwargs['t1FitSeries'] = t1FitSeries
-        if kSigmaCalc:
+        if kSigmaCalc and t1SeriesEval:
             print(r"Fitting kSigma")
             kSigmaFit = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
             kwargs['kSigmaFit'] = kSigmaFit
     if plotExts:
         print('Plotting evaluation figures...')
         make_figures(results, path=path, **kwargs)
+    print('All done')
     return results
 
 
