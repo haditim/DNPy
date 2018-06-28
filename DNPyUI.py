@@ -140,8 +140,10 @@ class EmittingStream(QtCore.QObject):
 
     textWritten = QtCore.pyqtSignal(str)
     def write(self, text):
-        if 'Evaluated' in text:
+        if 'Evaluate' in text:
             self.textWritten.emit(str('<span style=\'font-size: 11px; color:green;\'><b>'+text+'</b></span>'))
+        elif 'Error' in text:
+            self.textWritten.emit(str('<span style=\'font-size: 12px; color:red;\'><b>'+text+'</b></span>'))
         else:
             self.textWritten.emit(str('<span style=\'font-size: 12px;\'>'+text+'</span>'))
 
