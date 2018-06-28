@@ -2,7 +2,7 @@ from PyQt5 import uic
 from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
 import sys
 from functions import *
-import subprocess
+import re
 
 
 baseUIClass, baseUIWidget = uic.loadUiType("ui/DNPyUI.ui")
@@ -93,6 +93,7 @@ class AppWindow(baseUIWidget, baseUIClass):
         self.t1SeriesEval.setEnabled(False)
         self.makeFigs.setEnabled(False)
         self.resultsBrowser.setEnabled(True)
+        self.resultsLabel.setEnabled(True)
         self.startButton.setEnabled(False)
         self.cancelButton.setText("Abort")
         self.dnpThread = Thread(path, kwargs)
@@ -115,7 +116,7 @@ class AppWindow(baseUIWidget, baseUIClass):
         self.exps = exps
         self.cancelButton.setText("Close")
         sys.stdout = sys.__stdout__
-        print(self.resultsBrowser.toPlainText())
+        print(re.sub(r'<.*?>', '', self.resultsBrowser.toPlainText()))
 
 class Thread(QtCore.QThread):
     dataReady = QtCore.pyqtSignal(list)
@@ -138,9 +139,11 @@ class Thread(QtCore.QThread):
 class EmittingStream(QtCore.QObject):
 
     textWritten = QtCore.pyqtSignal(str)
-
     def write(self, text):
-        self.textWritten.emit(str(text))
+        if 'Evaluated' in text:
+            self.textWritten.emit(str('<span style=\'font-size: 11px; color:green;\'><b>'+text+'</b></span>'))
+        else:
+            self.textWritten.emit(str('<span style=\'font-size: 12px;\'>'+text+'</span>'))
 
         
 def main():
