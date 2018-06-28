@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>953</width>
-    <height>772</height>
+    <width>800</width>
+    <height>600</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -747,6 +747,7 @@ p, li { white-space: pre-wrap; }
   <tabstop>powerFile</tabstop>
   <tabstop>apCombo</tabstop>
   <tabstop>ftWindow</tabstop>
+  <tabstop>maxWin</tabstop>
   <tabstop>lB</tabstop>
   <tabstop>evalPath</tabstop>
   <tabstop>basCor</tabstop>
@@ -761,6 +762,7 @@ p, li { white-space: pre-wrap; }
   <tabstop>lSt1</tabstop>
   <tabstop>rSt1</tabstop>
   <tabstop>t1SeriesPolDeg</tabstop>
+  <tabstop>makeFigs</tabstop>
   <tabstop>jpg</tabstop>
   <tabstop>png</tabstop>
   <tabstop>pdf</tabstop>
@@ -769,8 +771,8 @@ p, li { white-space: pre-wrap; }
   <tabstop>figHeight</tabstop>
   <tabstop>figDpi</tabstop>
   <tabstop>startButton</tabstop>
-  <tabstop>resultsBrowser</tabstop>
   <tabstop>cancelButton</tabstop>
+  <tabstop>resultsBrowser</tabstop>
  </tabstops>
  <resources/>
  <connections/>

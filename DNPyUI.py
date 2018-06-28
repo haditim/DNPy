@@ -16,11 +16,11 @@ class AppWindow(baseUIWidget, baseUIClass):
         self.toolButton.clicked.connect(self.open_exp_powers)
         self.cancelButton.clicked.connect(self.close)
         self.startButton.clicked.connect(self.start)
-        sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
 
 
 
     def start(self):
+        sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
         path = self.path.text()
         powerFile = self.powerFile.text()
         phase = ''
@@ -114,6 +114,11 @@ class AppWindow(baseUIWidget, baseUIClass):
 
     def onDataReady(self, exps):
         self.exps = exps
+        self.generalGroup.setEnabled(True)
+        self.dnpGroup.setEnabled(True)
+        self.t1SeriesEval.setEnabled(True)
+        self.makeFigs.setEnabled(True)
+        self.startButton.setEnabled(True)
         self.cancelButton.setText("Close")
         sys.stdout = sys.__stdout__
         print(re.sub(r'<.*?>', '', self.resultsBrowser.toPlainText()))
