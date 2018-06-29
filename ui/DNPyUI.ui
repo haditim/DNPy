@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>800</width>
+    <width>700</width>
     <height>600</height>
    </rect>
   </property>
@@ -254,7 +254,7 @@
              <item>
               <widget class="QCheckBox" name="kSigmaCalc">
                <property name="text">
-                <string>Calculate kSignma</string>
+                <string>Calculate kSigma</string>
                </property>
                <property name="checked">
                 <bool>true</bool>

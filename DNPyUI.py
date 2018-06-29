@@ -1,5 +1,6 @@
 from PyQt5 import uic
-from PyQt5 import QtCore, QtGui, QtWidgets, QtWebEngineWidgets
+from PyQt5.QtWidgets import QApplication, QFileDialog
+from PyQt5.QtCore import QThread, pyqtSignal, QObject, QCoreApplication, pyqtSlot
 import sys
 from functions import *
 import re
@@ -14,7 +15,7 @@ class AppWindow(baseUIWidget, baseUIClass):
         self.setupUi(self)
         self.pathButton.clicked.connect(self.open_exp_path)
         self.toolButton.clicked.connect(self.open_exp_powers)
-        self.cancelButton.clicked.connect(QtCore.QCoreApplication.instance().quit)
+        self.cancelButton.clicked.connect(QCoreApplication.instance().quit)
         self.startButton.clicked.connect(self.start)
 
 
@@ -123,8 +124,8 @@ class AppWindow(baseUIWidget, baseUIClass):
         sys.stdout = sys.__stdout__
         print(re.sub(r'<.*?>', '', self.resultsBrowser.toPlainText()))
 
-class Thread(QtCore.QThread):
-    dataReady = QtCore.pyqtSignal(list)
+class Thread(QThread):
+    dataReady = pyqtSignal(list)
     def __init__(self, path, kwargs):
         super().__init__()
         self.path = path
@@ -133,7 +134,7 @@ class Thread(QtCore.QThread):
     def stop(self):
         self._flag = False
 
-    @QtCore.pyqtSlot(list)
+    @pyqtSlot(list)
     def run(self):
         self._flag = True
         exps = return_exps(self.path, **self.kwargs)
@@ -141,12 +142,12 @@ class Thread(QtCore.QThread):
 
 
 
-class EmittingStream(QtCore.QObject):
+class EmittingStream(QObject):
 
-    textWritten = QtCore.pyqtSignal(str)
+    textWritten = pyqtSignal(str)
     def write(self, text):
         if 'Evaluate' in text:
-            self.textWritten.emit(str('<span style=\'font-size: 11px; color:green;\'><b>'+text+'</b></span>'))
+            self.textWritten.emit(str('<span style=\'font-size: 11px; color:green; margin-bottom:-20px;;\'><b>'+text+'</b></span>'))
         elif 'Error' in text:
             self.textWritten.emit(str('<span style=\'font-size: 12px; color:red;\'><b>'+text+'</b></span>'))
         else:
@@ -154,7 +155,7 @@ class EmittingStream(QtCore.QObject):
 
         
 def main():
-    app = QtWidgets.QApplication(sys.argv)
+    app = QApplication(sys.argv)
     w = AppWindow()
     w.show()
     sys.exit(app.exec_())

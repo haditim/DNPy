@@ -970,10 +970,10 @@ def dumpAllToCSV(results, path, **kwargs):
     if t1SeriesEval:
         np.savetxt(os.path.join(path,evalPath,'t1series.csv'), t1Series, delimiter='\t',
                    header=('expNum\tpowerMw\tpowerDbm\tt1\tt1error'))
-    if kSigmaCalc:
-        np.savetxt(os.path.join(path, evalPath, 'ksigma.csv'),
-                   np.asarray((dnpEnh[:,1],kSigmaFit['kSigmaCor'],kSigmaFit['kSigmaUncor'])).transpose(),
-                   delimiter='\t', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
+        if kSigmaCalc:
+            np.savetxt(os.path.join(path, evalPath, 'ksigma.csv'),
+                       np.asarray((dnpEnh[:,1],kSigmaFit['kSigmaCor'],kSigmaFit['kSigmaUncor'])).transpose(),
+                       delimiter='\t', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
 
 
 def make_figures(results, path='', **kwargs):
@@ -1036,7 +1036,7 @@ def make_figures(results, path='', **kwargs):
     ax6 = fig6.add_subplot(111)
     # Generating figures for dnp folders and collection of data
     for i, value in enumerate(results):
-        print('Ploting exp {} figures'.format(str(int(value.expNum))))
+        print('Ploفting exp {} figures'.format(str(int(value.expNum))))
         if value.expType == 'dnp':  # FID plots
             figure = plt.figure(figsize=figSize)
             plt.plot(value.fidTimeHistory['bLeftShift'], np.real(
