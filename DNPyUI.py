@@ -14,7 +14,7 @@ class AppWindow(baseUIWidget, baseUIClass):
         self.setupUi(self)
         self.pathButton.clicked.connect(self.open_exp_path)
         self.toolButton.clicked.connect(self.open_exp_powers)
-        self.cancelButton.clicked.connect(self.close)
+        self.cancelButton.clicked.connect(QtCore.QCoreApplication.instance().quit)
         self.startButton.clicked.connect(self.start)
 
 
