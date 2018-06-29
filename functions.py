@@ -949,6 +949,7 @@ def return_exps(path, **kwargs):
                 kwargs['t1FitSeries'] = t1FitSeries
         if kSigmaCalc and t1SeriesEval:
             print(r"Fitting kSigma")
+            # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
             kSigmaFit = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
             kwargs['kSigmaFit'] = kSigmaFit
     if plotExts:

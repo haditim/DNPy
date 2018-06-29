@@ -1,36 +1,39 @@
 * DNPy
 
   *DNPy* is a Python code package to evaluate continuous wave (CW) Overhauser dynamic nuclear polarization (ODNP) experiments. DNPy has taken the core functionality from [[https://github.com/bennomeier/pyNMR][pyNMR]].
+#+attr_html: :width 100%
+[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/cf/bd/cfbd3600-4c85-4a8f-a6ba-e616ada2ca95/dnpyui.jpg__799x681_q85_subsampling-2_upscale.jpg]]
 
 * Sample output
- - kSigma:
 #+attr_html: :width 100%
-[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/3f/27/3f278115-526f-4c4c-8d4d-cc14787481ae/ksigma.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
- - ODNP enhancement
-#+attr_html: :width 90%
-[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/f8/d2/f8d2a08b-34a3-490c-acf5-d8f070efce85/normalized_odnp_enhancement.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
- - T1 inversion recovery fit
-#+attr_html: :width 90%
-[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/fc/70/fc70ac2e-146d-483a-a910-e2342f56bab7/t1.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
- - T1 power series
-#+attr_html: :width 90%
-[[file:http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/77/cb/77cbe6d4-f806-426d-ba61-aa91994ab3c3/t1_time_series.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]y
+[[http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/ad/43/ad43ea9a-c23a-42d4-a7e8-2b5bbe76a637/dnpyoutput.jpg__1000x562_q85_subsampling-2_upscale.jpg]]
 
+* Installation
+  You need to have python3 with following packages installed:
+- Numpy:
+  Install using ~pip3 install --user numpy~ or ~sudo apt install python3-numpy~ on linux.
+- Scipy:
+  Install using ~pip3 install --user scipy~ or ~sudo apt install python3-scipy~ on linux.
+- Matplotlib:
+  Install using ~pip3 install --user matplotlib~ or ~sudo apt install python3-matplotlib~ on linux.
+- PyQt5 (not needed if you don't need UI)
+  Install using ~pip3 install --user pyqt5~
+
+** GNU/Linux
+On GNU/Linux you can also use the setuptools package. Download from [[https://github.com/haditim/DNPy/tree/master/dist][dist]], extract and run ~python3 setup.py install~.
+
+** Windows
+You can install [[https://www.anaconda.com/download/][ANCONDA]] for windows to have all necessary packages installed (don't forget to pick python3 package). After installation you can run the folowing in the ocmmand prompt:
+~C:\ProgramData\Anaconda3\python.exe DNPyUI.py~
 
 * Usage
-  You need to have python3 with following packages installed:
-- Numpy
-  Install using ~pip3 install --user numpy~ or ~sudo apt install python3-numpy~ on linux.
-- Scipy
-  Install using ~pip3 install --user scipy~ or ~sudo apt install python3-scipy~ on linux.
-
-You can install [[https://www.anaconda.com/download/][ANCONDA]] for windows to have all necessary packages installed.
-Then DNPy can be run with the following:
+** User interface
+DNPyUI can be run with the following. It will show you an intuitive UI.
 #+BEGIN_SRC shell
-python3 dnpEval.py
+python3 DNPyUI.py
 #+END_SRC
-
-A sample usage is implemented in ~dnpEval.py~. You need to set the following variables in your dnpEval:
+** Function call
+If you prefer to use DNPy as a function call, you can import functions and setup kwargs for ~return_exps()~ function. A sample usage is implemented in ~dnpEval.py~. You need to set the following variables in your dnpEval:
 #+BEGIN_SRC python
 path = '/path/to/exp/folder/'
 powerFile = 'powers'
@@ -48,7 +51,7 @@ kwargs = {
     'basCor': True,  # baseline correction
     'evalPath': 'evalHadiTest',
     'plotDpi': 250,  # plot file resolution
-    'plotExts': ['jpg'],  # remove all if you do not want plots to be saved
+    'plotExts': [],  # remove all if you do not want plots to be saved
     'process': True,
     'debug': False,
     'dumpToCsv': True,
@@ -57,7 +60,7 @@ kwargs = {
     't1SeriesEval': True,
     't1SeriesPolDeg': 1,  # Polynomial degree for T1 series fit (default = 1)
     'kSigmaCalc': True,
-    }
+}
 
 #+END_SRC
 - ~path~ defines the ODNP experiment root folder.
