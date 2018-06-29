@@ -99,6 +99,7 @@ class AppWindow(baseUIWidget, baseUIClass):
         self.cancelButton.setText("Abort")
         self.dnpThread = Thread(path, kwargs)
         self.dnpThread.dataReady.connect(self.onDataReady)
+        self.dnpThread.errorEval.connect(self.onError)
         self.dnpThread.start()
 
     def normalOutputWritten(self, text):
@@ -124,8 +125,20 @@ class AppWindow(baseUIWidget, baseUIClass):
         sys.stdout = sys.__stdout__
         print(re.sub(r'<.*?>', '', self.resultsBrowser.toPlainText()))
 
+    def onError(self, error):
+        self.error = error
+        self.generalGroup.setEnabled(True)
+        self.dnpGroup.setEnabled(True)
+        self.t1SeriesEval.setEnabled(True)
+        self.makeFigs.setEnabled(True)
+        self.startButton.setEnabled(True)
+        self.cancelButton.setText("Close")
+        self.resultsBrowser.append(self.error)
+
+
 class Thread(QThread):
     dataReady = pyqtSignal(list)
+    errorEval = pyqtSignal(str)
     def __init__(self, path, kwargs):
         super().__init__()
         self.path = path
@@ -137,8 +150,12 @@ class Thread(QThread):
     @pyqtSlot(list)
     def run(self):
         self._flag = True
-        exps = return_exps(self.path, **self.kwargs)
-        self.dataReady.emit(exps)
+        try:
+            exps = return_exps(self.path, **self.kwargs)
+            self.dataReady.emit(exps)
+        except Exception as e:
+            self.errorEval.emit('<span style=\'font-size: 12px; color:red;\'><b>' \
+                                                    'There was an error evaluating your data ('+str(e)+')</b></span>')
 
 
 

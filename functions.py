@@ -802,9 +802,12 @@ def return_exps(path, **kwargs):
     # Taking care of powers csv file
     if powerFile:
         try:
-            openfile = open(path + '/' + powerFile + '.csv', 'r')
+            openfile = open(powerFile)
         except:
-            openfile = open(path + '/' + powerFile, 'r')
+            try:
+                openfile = open(path + '/' + powerFile + '.csv', 'r')
+            except:
+                openfile = open(path + '/' + powerFile, 'r')
         lines = openfile.readlines()
         if len(lines) == 1:
             lines = lines[0].split('\r')
@@ -1036,7 +1039,7 @@ def make_figures(results, path='', **kwargs):
     ax6 = fig6.add_subplot(111)
     # Generating figures for dnp folders and collection of data
     for i, value in enumerate(results):
-        print('Ploفting exp {} figures'.format(str(int(value.expNum))))
+        print('Plotting exp {} figures'.format(str(int(value.expNum))))
         if value.expType == 'dnp':  # FID plots
             figure = plt.figure(figsize=figSize)
             plt.plot(value.fidTimeHistory['bLeftShift'], np.real(
