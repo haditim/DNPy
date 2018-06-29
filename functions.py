@@ -770,13 +770,18 @@ def fwhm(x, y):
 
 def return_exps(path, **kwargs):
     debug = kwargs.get('debug', False)
+    dumpToCsv = kwargs.get('dumpToCsv', False)
     powerFile = kwargs.get('powerFile', '')
     phase = kwargs.get('phase', 'first')
     plotExts = kwargs.get('plotExts', [])
     process = kwargs.get('process', True)
     t1SeriesEval = kwargs.get('t1SeriesEval', True)
     kSigmaCalc = kwargs.get('kSigmaCalc', True)
+<<<<<<< HEAD
     dumpToCsv = kwargs.get('dumpToCsv', True)
+=======
+    path = str(path)
+>>>>>>> development
     filesInDir = os.listdir(path)
     dirs = []
     results = []
@@ -785,20 +790,28 @@ def return_exps(path, **kwargs):
     dnpCounter = 0
     powerMw = -1
     attPower = [[], []]
-
+    if not os.path.isdir(path):
+        print('Error: the folder does not exist.')
+        return False
     for name in filesInDir:
         try:
             dirs.append(float(name))
         except Exception as e:
             if debug:
                 print('{} not NMR experiment({}).'.format(name, e))
+    if not dirs:
+        print('Error: the folder does not contain any NMR experiments.')
+        return False
     dirs.sort()
     # Taking care of powers csv file
     if powerFile:
         try:
-            openfile = open(path + '/' + powerFile + '.csv', 'r')
+            openfile = open(powerFile)
         except:
-            openfile = open(path + '/' + powerFile, 'r')
+            try:
+                openfile = open(path + '/' + powerFile + '.csv', 'r')
+            except:
+                openfile = open(path + '/' + powerFile, 'r')
         lines = openfile.readlines()
         if len(lines) == 1:
             lines = lines[0].split('\r')
@@ -934,16 +947,18 @@ def return_exps(path, **kwargs):
                 t1SeriesPolDeg = kwargs.get('t1SeriesPolDeg', 1)
                 t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
                 kwargs['t1FitSeries'] = t1FitSeries
-        if kSigmaCalc:
+        if kSigmaCalc and t1SeriesEval:
             print(r"Fitting kSigma")
             kSigmaFit = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
             kwargs['kSigmaFit'] = kSigmaFit
     if plotExts:
         print('Plotting evaluation figures...')
         make_figures(results, path=path, **kwargs)
+
     if dumpToCsv:
         print('Saving CSV files...')
         dumpAllToCSV(results, path=path, **kwargs)
+    print('All done')
     return results
 
 
@@ -962,11 +977,10 @@ def dumpAllToCSV(results, path, **kwargs):
     if t1SeriesEval:
         np.savetxt(os.path.join(path,evalPath,'t1series.csv'), t1Series, delimiter='\t',
                    header=('expNum\tpowerMw\tpowerDbm\tt1\tt1error'))
-    if kSigmaCalc:
-        np.savetxt(os.path.join(path, evalPath, 'ksigma.csv'),
-                   np.asarray((dnpEnh[:,1],kSigmaFit['kSigmaCor'],kSigmaFit['kSigmaUncor'])).transpose(),
-                   delimiter='\t', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
-
+        if kSigmaCalc:
+            np.savetxt(os.path.join(path, evalPath, 'ksigma.csv'),
+                       np.asarray((dnpEnh[:,1],kSigmaFit['kSigmaCor'],kSigmaFit['kSigmaUncor'])).transpose(),
+                       delimiter='\t', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
 
 
 def make_figures(results, path='', **kwargs):
@@ -1016,6 +1030,11 @@ def make_figures(results, path='', **kwargs):
     ax4.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     ax4.set_xlabel('Frequency offset (Hz)')
     ax4.set_ylabel('Intensity (a.u.)')
+    fig7 = plt.figure(figsize=figSize)
+    ax7 = fig7.add_subplot(111)
+    ax7.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax7.set_xlabel('Frequency offset (Hz)')
+    ax7.set_ylabel('Intensity (a.u.)')
     fig5 = plt.figure(figsize=figSize)  # time vs centerFreq
     ax5 = fig5.add_subplot(111)
     ax5.set_xlabel('time (mim)')
@@ -1024,7 +1043,7 @@ def make_figures(results, path='', **kwargs):
     ax6 = fig6.add_subplot(111)
     # Generating figures for dnp folders and collection of data
     for i, value in enumerate(results):
-        print('Ploting exp {} figures'.format(str(int(value.expNum))))
+        print('Plotting exp {} figures'.format(str(int(value.expNum))))
         if value.expType == 'dnp':  # FID plots
             figure = plt.figure(figsize=figSize)
             plt.plot(value.fidTimeHistory['bLeftShift'], np.real(
@@ -1073,6 +1092,12 @@ def make_figures(results, path='', **kwargs):
             ax4.set_title('FT after phasing to %.0f degrees' % value.ph)
             ax4.grid(True)
             ax4.set_xlim(value.maxFreq - value.ftWindow,
+                         value.maxFreq + value.ftWindow)
+            ax7.plot(value.frequency, np.abs(value.allFid[5][0])*value.real[1]/np.abs(value.real[1]), label=(
+                '{:.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())
+            ax7.set_title('FT after phasing to %.0f degrees' % value.ph)
+            ax7.grid(True)
+            ax7.set_xlim(value.maxFreq - value.ftWindow,
                          value.maxFreq + value.ftWindow)
             # Data for DNP figs
             # centerFreq.append([((value.expTime-expStart)/60.),
@@ -1219,15 +1244,19 @@ def make_figures(results, path='', **kwargs):
     plt.close(fig3)
     ax4.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     fig4.tight_layout()
-    [fig4.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing.' + x)), dpi=plotDpi)
+    [fig4.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing_real.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(fig4)
+    ax7.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    fig7.tight_layout()
+    [fig7.savefig(os.path.join(path, evalPath, ('06_FT_after_phasing_magn.' + x)), dpi=plotDpi)
+     for x in plotExts]
+    plt.close(fig7)
     plt.close(fig5)
     ax6.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     fig6.tight_layout()
     [fig6.savefig(os.path.join(path, evalPath, ('normalized_ODNP_enhancement.' + x)), dpi=plotDpi)
      for x in plotExts]
-    #  dumpAllToCSV(path, evalPath, dnpEnh)
     plt.close(figure)
     if t1SeriesEval:
         # Main T1 figure
