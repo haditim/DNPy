@@ -777,11 +777,7 @@ def return_exps(path, **kwargs):
     process = kwargs.get('process', True)
     t1SeriesEval = kwargs.get('t1SeriesEval', True)
     kSigmaCalc = kwargs.get('kSigmaCalc', True)
-<<<<<<< HEAD
     dumpToCsv = kwargs.get('dumpToCsv', True)
-=======
-    path = str(path)
->>>>>>> development
     filesInDir = os.listdir(path)
     dirs = []
     results = []
