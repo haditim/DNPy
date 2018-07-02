@@ -17,14 +17,16 @@
 - Matplotlib:
   Install using ~pip3 install --user matplotlib~ or ~sudo apt install python3-matplotlib~ on linux.
 - PyQt5 (not needed if you don't need UI)
-  Install using ~pip3 install --user pyqt5~
+  Install using ~pip3 install --user pyqt5~.
+
+Additionally, if you want to have JPG output plots, you need to install pillow: ~pip3 install --user pillow~. 
 
 ** GNU/Linux
-On GNU/Linux you can also use the setuptools package. Download from [[https://github.com/haditim/DNPy/tree/master/dist][dist]], extract and run ~python3 setup.py install~.
+On GNU/Linux you can also use the setuptools package. Download installer DNPyUI-x.x.x_installer.tar.gz from [[https://github.com/haditim/DNPy/tree/master/dist][dist]], extract and run ~python3 setup.py install~ or download DNPyUI-x.x.x_linux.tar.gz binary from  [[https://github.com/haditim/DNPy/tree/master/dist][dist]], extract and run DNPyUI.
 
 ** Windows
-You can install [[https://www.anaconda.com/download/][ANCONDA]] for windows to have all necessary packages installed (don't forget to pick python3 package). After installation you can run the folowing in the ocmmand prompt:
-~C:\ProgramData\Anaconda3\python.exe DNPyUI.py~
+You can install [[https://www.anaconda.com/download/][ANCONDA]] for windows to have all necessary packages installed (don't forget to pick python3 package). After installation you can run the folowing in the command prompt:
+~C:\ProgramData\Anaconda3\python.exe DNPyUI.py~. Installation directory can differ based on your selection when installing Anaconda.
 
 * Usage
 ** User interface
@@ -44,7 +46,7 @@ kwargs = {
     'maxWin': 1000,  # Does not allow peaks out of this domain to be calculated in int.
     'lS': 70,  # Left shift points or 'auto'
     'lSt1': 70,  # LS for t1 experiments (this differs from DNP sometimes)
-    'rS': 110,  # Right shidt points
+    'rS': 110,  # Right shift points
     'rSt1': 75,
     'lB': 2,  # Line boradening [Hz]
     'offCor': True,  # offset correctioon

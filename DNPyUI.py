@@ -6,13 +6,16 @@ from functions import *
 import re
 
 
-baseUIClass, baseUIWidget = uic.loadUiType("ui/DNPyUI.ui")
+baseUIClass, baseUIWidget = uic.loadUiType(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ui', 'DNPyUI.ui'))
 
 
 class AppWindow(baseUIWidget, baseUIClass):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.setupUi(self)
+        self.label_4.setText('<img src=\"'+os.path.join('ui', 'logo_red_shade_nostroke_120_small.png')+'\" />')
+        self.label_5.setText('<a href=\"http://www.spintoolbox.com/\"><span style=\" text-decoration: underline; color:#0000ff;\">SpinToolbox.com</span></a>')
+        self.label_5.setOpenExternalLinks(True)
         self.pathButton.clicked.connect(self.open_exp_path)
         self.toolButton.clicked.connect(self.open_exp_powers)
         self.cancelButton.clicked.connect(QCoreApplication.instance().quit)
