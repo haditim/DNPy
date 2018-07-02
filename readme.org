@@ -16,7 +16,7 @@
 
 If you have a calibration curve based on main attenuation setting, you can use the following instead:
 
-~XXXXX - set XX dB~ example: ~CWODNP - set 10 dBm~
+~XXXXX - set XX dB~ example: ~CWODNP - set 10 dB~
 
 This however requires you to have a data calibration file as a CSV when using DNPy which should have comma as a separator and 2 columns (dB set - dBm output).
 * Installation
