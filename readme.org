@@ -8,6 +8,17 @@
 #+attr_html: :width 100%
 [[http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/ad/43/ad43ea9a-c23a-42d4-a7e8-2b5bbe76a637/dnpyoutput.jpg__1000x562_q85_subsampling-2_upscale.jpg]]
 
+* Experiments naming style
+
+  To be able to use this code package, you need to have power set written in your experiment title with the following style:
+
+~XXXXX - set XX dBm~ example: ~CWODNP - set 10 dBm~, ~T1 experiment - set 5 dBm~
+
+If you have a calibration curve based on main attenuation setting, you can use the following instead:
+
+~XXXXX - set XX dB~ example: ~CWODNP - set 10 dBm~
+
+This however requires you to have a data calibration file as a CSV when using DNPy which should have comma as a separator and 2 columns (dB set - dBm output).
 * Installation
   You need to have python3 with following packages installed:
 - Numpy:
