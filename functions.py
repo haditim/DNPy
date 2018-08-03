@@ -653,6 +653,12 @@ class NMRData(object):
         try:
             self.phaseCycles = len(self.allFid[0]) / len(self.vdList)
             vdListLen = len(self.vdList)
+            if int(self.phaseCycles) != self.phaseCycles:
+                raise ValueError
+        except ValueError:
+            print('Exp. {}: The number of FIDs ({}) and vdList ({}) do not match. '
+                  'There should have been a problem in your experiment'.format(self.title, len(self.allFid[0]), len(self.vdList)))
+            pass
         except Exception as e:
             if self.debug:
                 print('No phase cycling channel found ({}).'.format(e))
@@ -786,6 +792,14 @@ def return_exps(path, **kwargs):
     dnpCounter = 0
     powerMw = -1
     attPower = [[], []]
+    evalPath = kwargs.get('evalPath', 'eval')
+    try:  # Taking care of evaluation dir
+        os.mkdir(os.path.join(path, evalPath))
+    except Exception as e:
+        if '17' not in str(e):
+            print('{} occured when trying to create evalPath'.format(e))
+        pass
+    """ Plots ind. experiments and calculate T1, enhancement, etc. """
     if not os.path.isdir(path):
         print('Error: the folder does not exist.')
         return False
@@ -843,7 +857,7 @@ def return_exps(path, **kwargs):
                 result = NMRData(os.path.join(path, str(name).split('.')[0]),
                                  "TopSpin", autoPhase=False, ph=ph, **kwargs)
         except Exception as e:
-            print("Problem adding exp ", name, ". The error is: ", e)
+            print("Problem adding exp {}. The error is: {}".format(int(name), e))
         result.expNum = name
         if 'dBm' in result.title:
             result.powerDbm = float(result.title.split(" ")[-2])
@@ -994,13 +1008,6 @@ def make_figures(results, path='', **kwargs):
     plotExts = kwargs.get('plotExts', ['jpg'])
     t1SeriesEval = kwargs.get('t1SeriesEval', True)
     kSigmaCalc = kwargs.get('kSigmaCalc', True)
-    try:  # Taking care of evaluation dir
-        os.mkdir(os.path.join(path, evalPath))
-    except Exception as e:
-        if '17' not in str(e):
-            print('{} occured when trying to create evalPath'.format(e))
-        pass
-    """ Plots ind. experiments and calculate T1, enhancement, etc. """
     # Initializing figures
     fig0 = plt.figure(figsize=figSize)
     ax0 = fig0.add_subplot(111)
