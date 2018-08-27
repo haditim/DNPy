@@ -657,7 +657,8 @@ class NMRData(object):
                 raise ValueError
         except ValueError:
             print('Exp. {}: The number of FIDs ({}) and vdList ({}) do not match. '
-                  'There should have been a problem in your experiment'.format(self.title, len(self.allFid[0]), len(self.vdList)))
+                  'There should have been a problem in your experiment'.format(self.title, len(self.allFid[0]),
+                                                                               len(self.vdList)))
             pass
         except Exception as e:
             if self.debug:
@@ -943,7 +944,7 @@ def return_exps(path, **kwargs):
         enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
         kwargs['dnpEnh'] = dnpEnh
         kwargs['enhancementFit'] = enhancementFit
-        if t1SeriesEval:
+        if t1SeriesEval or kSigmaCalc:
             if not t1Series:
                 print('Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
                 t1SeriesEval = False
@@ -982,15 +983,15 @@ def dumpAllToCSV(results, path, **kwargs):
     t1SeriesEval = kwargs.get('t1SeriesEval', True)
     kSigmaCalc = kwargs.get('kSigmaCalc', True)
     # dnpEnh: expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
-    np.savetxt(os.path.join(path,evalPath,'enhancements.csv'), dnpEnh, delimiter='\t',
+    np.savetxt(os.path.join(path, evalPath, 'enhancements.csv'), dnpEnh, delimiter='\t',
                header=('expNum\tpowerMw\tpowerDbm\tintReal\tnormIntReal\tintMagn\tnormIntMagn\tforward'))
     # t1Series expNum, powerMw, powerDbm, t1, t1error
     if t1SeriesEval:
-        np.savetxt(os.path.join(path,evalPath,'t1series.csv'), t1Series, delimiter='\t',
+        np.savetxt(os.path.join(path, evalPath, 't1series.csv'), t1Series, delimiter='\t',
                    header=('expNum\tpowerMw\tpowerDbm\tt1\tt1error'))
         if kSigmaCalc:
             np.savetxt(os.path.join(path, evalPath, 'ksigma.csv'),
-                       np.asarray((dnpEnh[:,1],kSigmaFit['kSigmaCor'],kSigmaFit['kSigmaUncor'])).transpose(),
+                       np.asarray((dnpEnh[:, 1], kSigmaFit['kSigmaCor'], kSigmaFit['kSigmaUncor'])).transpose(),
                        delimiter='\t', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
 
 
@@ -1047,8 +1048,8 @@ def make_figures(results, path='', **kwargs):
     ax6 = fig6.add_subplot(111)
     # Generating figures for dnp folders and collection of data
     for i, value in enumerate(results):
-        print('Plotting exp {} figures'.format(str(int(value.expNum))))
         if value.expType == 'dnp':  # FID plots
+            print('Plotting exp {} figures (DNP)'.format(str(int(value.expNum))))
             figure = plt.figure(figsize=figSize)
             plt.plot(value.fidTimeHistory['bLeftShift'], np.real(
                 value.allFid[0][0]), label='real')
@@ -1066,12 +1067,13 @@ def make_figures(results, path='', **kwargs):
                 '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # original
             ax1.plot(value.fidTimeHistory['bZeroFilling'], np.real(value.allFid[1][0]), label=(
                 '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm,
-                                                 value.powerMw)).expandtabs())  # after left and right shift and baselineCorrection
+                                                      value.powerMw)).expandtabs())  # after left and right shift and baselineCorrection
             ax2.plot(value.fidTime, np.real(value.allFid[2][0]), label=(
-                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # after zero filling
+                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm,
+                                                      value.powerMw)).expandtabs())  # after zero filling
             ax3.plot(value.fidTime, np.real(value.allFid[3][0]), label=(
                 '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm,
-                                                 value.powerMw)).expandtabs())  # after exponential windowing
+                                                      value.powerMw)).expandtabs())  # after exponential windowing
             # FT plots
             figure = plt.figure(figsize=figSize)
             plt.plot(value.frequency, np.real(
@@ -1097,7 +1099,7 @@ def make_figures(results, path='', **kwargs):
             ax4.grid(True)
             ax4.set_xlim(value.maxFreq - value.ftWindow,
                          value.maxFreq + value.ftWindow)
-            ax7.plot(value.frequency, np.abs(value.allFid[5][0])*value.real[1]/np.abs(value.real[1]), label=(
+            ax7.plot(value.frequency, np.abs(value.allFid[5][0]) * value.real[1] / np.abs(value.real[1]), label=(
                 '{:.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())
             ax7.set_title('FT after phasing to %.0f degrees' % value.ph)
             ax7.grid(True)
@@ -1106,7 +1108,8 @@ def make_figures(results, path='', **kwargs):
             # Data for DNP figs
             # centerFreq.append([((value.expTime-expStart)/60.),
             #                    value.expCenterFreq, value.expNum, value.powerMw])
-        elif value.expType == 't1':
+        elif value.expType == 't1' and t1SeriesEval:
+            print('Plotting exp {} figures (T1)'.format(str(int(value.expNum))))
             figure = plt.figure(figsize=figSize)
             plt.errorbar(value.fitData[0], value.fitData[1],
                          yerr=(value.fitData[1] - value.t1fit['evalY']),
@@ -1219,8 +1222,12 @@ def make_figures(results, path='', **kwargs):
                          xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
                          xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) - min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
                          va='center', ha='right', size=9, color='red', alpha=0.6)
-    ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--', label='(magn.) '+enhancementFit['enhancementFormula'])
-    ax6.annotate(enhancementFit['annotation'], xy=(0.4, 0.5), xycoords='axes fraction')
+    ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--',
+             label='(magn.) ' + enhancementFit['enhancementFormula'])
+    ax6.plot(enhancementFit['xdata'], enhancementFit['ydataExp'], 'g--',
+             label='(magn.) ' + enhancementFit['enhancementFormulaExp'])
+    ax6.annotate(enhancementFit['annotation'], xy=(0.4, 0.5), xycoords='axes fraction', color='blue')
+    ax6.annotate(enhancementFit['annotationExp'], xy=(0.55, 0.5), xycoords='axes fraction', color='green')
     ax6.set_title('Normalized DNP enhancement')
     ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
     ax6.set_xlabel('Power (mW)')
@@ -1283,21 +1290,21 @@ def make_figures(results, path='', **kwargs):
         [plt.savefig(os.path.join(path, evalPath, ('T1_time_series.' + x)), dpi=plotDpi)
          for x in plotExts]
         plt.close(figure)
-    if kSigmaCalc:
-        # kSigma figure
-        figure = plt.figure(figsize=figSize)
-        plt.plot(dnpEnh[:,1],kSigmaFit['kSigmaCor'], 'o', c='green', label ='cor')
-        plt.plot(dnpEnh[:,1],kSigmaFit['kSigmaUncor'], 'o', c='red', label ='uncor')
-        plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataCor'], '--', c='green', label=kSigmaFit['corFormula'])
-        plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataUncor'], '--', c='red', label =kSigmaFit['uncorFormula'])
-        plt.xlabel('Power (mW)')
-        plt.ylabel(r'$k_{\sigma}s(P)C$  $(\frac{1}{s})$')
-        plt.title(r'$k_{\sigma}$ calculations')
-        plt.legend()
-        figure.tight_layout()
-        [plt.savefig(os.path.join(path, evalPath, ('kSigma.' + x)), dpi=plotDpi)
-         for x in plotExts]
-        plt.close(figure)
+        if kSigmaCalc:
+            # kSigma figure
+            figure = plt.figure(figsize=figSize)
+            plt.plot(dnpEnh[:, 1], kSigmaFit['kSigmaCor'], 'o', c='green', label='cor')
+            plt.plot(dnpEnh[:, 1], kSigmaFit['kSigmaUncor'], 'o', c='red', label='uncor')
+            plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataCor'], '--', c='green', label=kSigmaFit['corFormula'])
+            plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataUncor'], '--', c='red', label=kSigmaFit['uncorFormula'])
+            plt.xlabel('Power (mW)')
+            plt.ylabel(r'$k_{\sigma}s(P)C$  $(\frac{1}{s})$')
+            plt.title(r'$k_{\sigma}$ calculations')
+            plt.legend()
+            figure.tight_layout()
+            [plt.savefig(os.path.join(path, evalPath, ('kSigma.' + x)), dpi=plotDpi)
+             for x in plotExts]
+            plt.close(figure)
 
 
 def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitting
@@ -1327,17 +1334,30 @@ def fit_enhancement(power, enhancement):
     def func(x, a, b, c, d):
         return a * np.exp(-b * x ** c) + d
 
-    popt, pcov = curve_fit(func, power, enhancement, maxfev = 10000)
+    def func_exp(x, a, b, d):
+        return a * np.exp(-b * x) + d
+
+    poptExp, pcovExp = curve_fit(func_exp, power, enhancement, maxfev=50000)
+    popt, pcov = curve_fit(func, power, enhancement, maxfev=50000, p0=(poptExp[0], poptExp[1], 1, poptExp[2]))
+    print("Enhancement fit values are {} for normal and {} for exponential fit".format(popt, poptExp))
     eMax = func(np.inf, *popt)
     eP = 1 - (1 - eMax) / 2
     sd = 0  # square deviation
+    eMaxExp = func_exp(np.inf, *poptExp)
+    ePExp = 1 - (1 - eMaxExp) / 2
+    sdExp = 0  # square deviation
     for i in range(len(power)):
         sd += np.square(enhancement[i] - func(power[i], *popt))
+        sdExp += np.square(enhancement[i] - func_exp(power[i], *poptExp))
     rmsd = np.sqrt(sd / len(power))
+    rmsdExp = np.sqrt(sdExp / len(power))
     xdata = np.linspace(min(power), max(power), 50000)
     ydata = func(xdata, *popt)
+    ydataExp = func_exp(xdata, *poptExp)
     eHalf = min(abs(ydata - eP))
+    eHalfExp = min(abs(ydataExp - ePExp))
     pHalf = np.asarray(list(zip(xdata, ydata)))[abs(ydata - eP) == eHalf][0][0]
+    pHalfExp = np.asarray(list(zip(xdata, ydataExp)))[abs(ydataExp - ePExp) == eHalfExp][0][0]
     return {
         'rmsd': rmsd,
         'xdata': xdata,
@@ -1346,33 +1366,45 @@ def fit_enhancement(power, enhancement):
         'pHalf': pHalf,
         'eMax': eMax,
         'eP': eP,
-        'enhancementFormula': r"$E(P) = {:5.2f}exp({:+5.2f} P^{{{:5.2f}}}) {:+5.2f}$, RMSD = {:5.2f}".
+        'enhancementFormula': r"$E(P) = {:5.2f}exp({:+5.3f} P^{{{:5.2f}}}) {:+5.2f}$, RMSD = {:5.2f}".
             format(*popt, rmsd),
         'annotation': r"$S_{{rel}}(P) = \frac{{P / {:5.2f} }}{{1+P / {:5.2f} }}$"
                       "\n"
                       r"$E_{{max}} = {:5.2f}$".format(pHalf, pHalf, func(np.inf, *popt)),
+        'rmsdExp': rmsdExp,
+        'ydataExp': ydataExp,
+        'eHalfExp': eHalfExp,
+        'pHalfExp': pHalfExp,
+        'eMaxExp': eMaxExp,
+        'ePExp': ePExp,
+        'enhancementFormulaExp': r"$E(P) = {:5.2f}exp({:+5.3f} P) {:+5.2f}$, RMSD = {:5.2f}".
+            format(*poptExp, rmsd),
+        'annotationExp': r"$S_{{rel}}(P) = \frac{{P / {:5.2f} }}{{1+P / {:5.2f} }}$"
+                         "\n"
+                         r"$E_{{max}} = {:5.2f}$".format(pHalfExp, pHalfExp, func_exp(np.inf, *poptExp)),
     }
 
 
 def k_sigma_calc(power, enhancement, t1SeriesFunc, t1SeriesFit, spaceNo=500):
-    kSigmaUncor = [((1-enhancement[i])*.00152/t1SeriesFunc(power[0])) for i in range(len(power))]
-    kSigmaCor = [((1-enhancement[i])*.00152/t1SeriesFunc(power[i])) for i in range(len(power))]
+    kSigmaUncor = [((1 - enhancement[i]) * .00152 / t1SeriesFunc(power[0])) for i in range(len(power))]
+    kSigmaCor = [((1 - enhancement[i]) * .00152 / t1SeriesFunc(power[i])) for i in range(len(power))]
 
     def func(x, a, b):
         return a * x / (b + x)
+
     poptCor, pcovCor = curve_fit(func, power, kSigmaCor, maxfev=10000)
     poptUncor, pcovUncor = curve_fit(func, power, kSigmaUncor, maxfev=10000)
     kSigmaSmaxCor = func(10e100, *poptCor)
     kSigmaSmaxUncor = func(10e100, *poptUncor)
     xdata = np.linspace(min(power), max(power), spaceNo)
-    return{
+    return {
         'kSigmaCor': kSigmaCor,
         'kSigmaUncor': kSigmaUncor,
-        'fitCor': lambda x: func(x,*poptCor),
-        'fitUncor': lambda x: func(x,*poptUncor),
+        'fitCor': lambda x: func(x, *poptCor),
+        'fitUncor': lambda x: func(x, *poptUncor),
         'xdata': xdata,
-        'ydataCor': func(xdata,*poptCor),
-        'ydataUncor': func(xdata,*poptUncor),
+        'ydataCor': func(xdata, *poptCor),
+        'ydataUncor': func(xdata, *poptUncor),
         'kSigmaSmaxCor': kSigmaSmaxCor,
         'kSigmaSmaxUncor': kSigmaSmaxUncor,
         'corFormula': r'$k_{{\sigma}}s(P)C = \frac{{{:.2e}\times P}}{{{:.2f}+P}}$'
