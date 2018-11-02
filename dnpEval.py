@@ -3,7 +3,7 @@ from typing import List
 from functions import *
 from functions import NMRData
 
-path = '/mnt/EPR-HADI/HADI/Data/ODNP/Tests/20180802_CWODNP_TempolTest4'
+path = '/mnt/EPR-HADI/HADI/Data/ODNP/Tests/20180518_TCDA1_ON_pH11'
 powerFile = ''
 kwargs = {
     't1Calc': 'PCreal',  # 'PCreal' for real phase cycled channel or 'PCmagn' or 'real' or 'magn'
@@ -17,12 +17,13 @@ kwargs = {
     'lB': 2,  # Line boradening [Hz]
     'offCor': True,  # offset correctioon
     'basCor': True,  # baseline correction
-    'evalPath': 'evalHadiTest',
+    'evalPath': 'evalHadiTest3d',
     'plotDpi': 250,  # plot file resolution
-    'plotExts': [],  # remove all if you do not want plots to be saved
+    'plotExts': ['jpg', 'pdf'],  # remove all if you do not want plots to be saved
+    'make3dPlots': True,
     'process': True,
     'debug': False,
-    'dumpToCsv': True,
+    'dumpToCsv': False,
     'figSize': (13, 8),
     'powerFile': powerFile,
     't1SeriesEval': True,
