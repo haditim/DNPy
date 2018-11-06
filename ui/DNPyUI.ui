@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>750</width>
-    <height>650</height>
+    <height>772</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -633,6 +633,26 @@
            <widget class="QLabel" name="plotExtsLabel">
             <property name="text">
              <string>Formats</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="Plot3dLabel">
+            <property name="text">
+             <string>Other options</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QCheckBox" name="make3dPlots">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="text">
+             <string>make 3D plots (may take longer)</string>
+            </property>
+            <property name="checked">
+             <bool>true</bool>
             </property>
            </widget>
           </item>

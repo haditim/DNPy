@@ -67,6 +67,7 @@ class AppWindow(baseUIWidget, baseUIClass):
         figWidth = self.figWidth.value()
         figHeight = self.figHeight.value()
         figDpi = self.figDpi.value()
+        make3dPlots = True if self.make3dPlots.isChecked() else False
 
         kwargs = {
             't1Calc': t1Calc,
@@ -91,6 +92,7 @@ class AppWindow(baseUIWidget, baseUIClass):
             't1SeriesEval': t1SeriesEval,
             't1SeriesPolDeg': t1SeriesPolDeg,
             'kSigmaCalc': kSigmaCalc,
+            'make3dPlots': make3dPlots,
         }
         self.generalGroup.setEnabled(False)
         self.dnpGroup.setEnabled(False)
