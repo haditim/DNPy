@@ -1,4 +1,6 @@
 # DNPy functions file
+import datetime
+
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
@@ -13,6 +15,8 @@ from matplotlib import style
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.collections import PolyCollection, LineCollection
 from matplotlib import cm
+import scipy.io as sio
+import traceback
 
 style.use('seaborn-whitegrid')
 
@@ -72,6 +76,7 @@ class NMRData(object):
         self.powerMw = 0
         self.expTime = 0
         self.maxFreq = 0  # type: int
+        endianness = kwargs.get('endianness', np.dtype('<i4'))
         if datatype == 'TopSpin':
             # The acqus file containts the spectral width SW_h and 2*SizeTD2 as ##$TD
             # The acqu2s file contains TD1 as ##$TD
@@ -213,7 +218,7 @@ class NMRData(object):
                 titleFile = open(pathToTitle, mode='r')
                 title = list(titleFile)
                 self.title = ''.join([line.strip() for line in title])
-                if 'DNP' in self.title or 'line' in self.title or 'djustment' in self.title:
+                if 'DNP' in self.title or 'dnp' in self.title or 'baseline for integration' in self.title:
                     self.expType = 'dnp'
                 elif 'T1' in self.title or '$T_1$' in self.title or 'T_{1,0}' in self.title or 't1' in self.title:
                     self.expType = 't1'
@@ -795,6 +800,7 @@ def return_exps(path, **kwargs):
     dnpEnh = []  # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
     t1Series = []
     dnpCounter = 0
+    t1Counter = 0
     powerMw = -1
     attPower = [[], []]
     evalPath = kwargs.get('evalPath', 'eval')
@@ -809,15 +815,19 @@ def return_exps(path, **kwargs):
         print('Error: the folder does not exist.')
         return False
     for name in filesInDir:
-        try:
-            dirs.append(float(name))
-        except Exception as e:
-            if debug:
-                print('{} not NMR experiment({}).'.format(name, e))
+        # We do not use these names anymore, this is for Han's lab
+        if '304' not in name and '503' not in name and '700' not in name and '701' not in name:
+            try:
+                dirs.append(float(name))
+            except Exception as e:
+                if debug:
+                    print('{} not NMR experiment({}).'.format(name, e))
     if not dirs:
         print('Error: the folder does not contain any NMR experiments.')
         return False
     dirs.sort()
+    mainFiles = os.listdir(path)
+    matFiles = [i for i in mainFiles if i.endswith('.mat')]
     # Taking care of powers csv file
     if powerFile:
         try:
@@ -851,27 +861,51 @@ def return_exps(path, **kwargs):
     else:
         if debug:
             print("Proceding without powers file.")
+        # Trying to go compatible with data from Songi Han's lab
+        if matFiles:
+            # I do not know why byte order in Han's lab is big endians.
+            # This is to take care of that (not a good practice though).
+            kwargs['endianness'] = np.dtype('>i4')
+            t1PowerMatFile = sio.loadmat(
+                os.path.join(path, [i for i in mainFiles if i.endswith('.mat') and 't1' in i][0]))
+            dnpPowerMatFile = sio.loadmat(
+                os.path.join(path, [i for i in mainFiles if i.endswith('.mat') and 't1' not in i][0]))
+            t1PowerMatFile = np.asarray((t1PowerMatFile['timelist'], t1PowerMatFile['powerlist']))
+            dnpPowerMatFile = np.asarray((dnpPowerMatFile['timelist'], dnpPowerMatFile['powerlist']))
+
     attPower = np.asarray(attPower)
+    # Preparing experiment data
     for i, name in enumerate(dirs):
         try:
-            if (phase == 'first' and i == 0) or phase == 'all':
+            if (phase == 'first' and dnpCounter == 0) or phase == 'all':
                 result = NMRData(os.path.join(path, str(name).split('.')[0]),
                                  "TopSpin", autoPhase=True, ph=0, **kwargs)
                 ph = result.ph
             else:
-                result = NMRData(os.path.join(path, str(name).split('.')[0]),
-                                 "TopSpin", autoPhase=False, ph=ph, **kwargs)
+                try:
+                    if ph: ph = ph
+                    result = NMRData(os.path.join(path, str(name).split('.')[0]),
+                                     "TopSpin", autoPhase=False, ph=ph, **kwargs)
+                except:
+                    result = NMRData(os.path.join(path, str(name).split('.')[0]),
+                                     "TopSpin", autoPhase=True, ph=0, **kwargs)
+                    ph = result.ph
         except Exception as e:
             print("Problem adding exp {}. The error is: {}".format(int(name), e))
+            if debug:
+                print(traceback.format_exc())
+            continue
         result.expNum = name
+        # Calculate powers
         if 'dBm' in result.title:
             result.powerDbm = float(result.title.split(" ")[-2])
             result.dbSet = None
             result.powerMw = 10.0 ** ((result.powerDbm) / 10.0)
+        elif 'dB' in result.title:
+            result.dbSet = float(result.title[:-2].split("set ", 1)[1])
+        # for old times when I did not put dB in title, also done in Han's lab
         elif result.expType:
-            if 'dB' in result.title:
-                result.dbSet = float(result.title[:-2].split("set ", 1)[1])
-            else:  # for old times when I did not put dB in title
+            if powerFile:
                 try:
                     result.dbSet = float(result.title.split()[-1])
                 except Exception:
@@ -880,24 +914,40 @@ def return_exps(path, **kwargs):
                           So I use 60dB attenuation" % result.title)
                     result.dbSet = 60.
                     result.powerDbm = 0.
-            # This is for when Ryans code is used so that we have discrepencies
-            if len(attPower[1, :][attPower[0, :] == result.dbSet]) > 10:
-                result.powerDbm = np.sum(attPower[1, :][attPower[0, :] ==
-                                                        result.dbSet][10:20]) / len(
-                    attPower[1, :][attPower[0, :] == result.dbSet][10:20])
-            elif len(attPower[1, :][attPower[0, :] == result.dbSet]) != 0:
-                result.powerDbm = np.sum(attPower[1, :][attPower[0, :] == result.dbSet]) / len(
-                    attPower[1, :][attPower[0, :] == result.dbSet])
-            else:
-                if result.dbSet >= 40.:
-                    result.powerDbm = -99.0
-                    if debug:
-                        print('I could not find power for {:.0f} dB so I use -99 dBm'.
-                              format(result.dbSet))
+                # This is for when Ryans code is used and we have discrepencies
+                if len(attPower[1, :][attPower[0, :] == result.dbSet]) > 10:
+                    result.powerDbm = np.sum(attPower[1, :][attPower[0, :] ==
+                                                            result.dbSet][10:20]) / len(
+                        attPower[1, :][attPower[0, :] == result.dbSet][10:20])
+                elif len(attPower[1, :][attPower[0, :] == result.dbSet]) != 0:
+                    result.powerDbm = np.sum(attPower[1, :][attPower[0, :] == result.dbSet]) / len(
+                        attPower[1, :][attPower[0, :] == result.dbSet])
                 else:
-                    print('I could not find power for {:.0f} dB and I won\'t be using it'.
-                          format(result.dbSet))
-                    continue
+                    if result.dbSet >= 40.:
+                        result.powerDbm = -99.0
+                        if debug:
+                            print('I could not find power for {:.0f} dB so I use -99 dBm'.
+                                  format(result.dbSet))
+                    else:
+                        print('I could not find power for {:.0f} dB and I won\'t be using it'.
+                              format(result.dbSet))
+            elif result.expType == 'dnp' and matFiles:
+                if dnpCounter == 0: dnpFirstTime = result.expTime - float(dnpPowerMatFile[0][0])
+                if debug:
+                    print('exp time: ', datetime.datetime.fromtimestamp(result.expTime),
+                          ' time diff: ', datetime.datetime.fromtimestamp(result.expTime - dnpFirstTime),
+                          ' dnpCounter: ', dnpCounter,
+                          ' dir: ', name)
+                timeInd, time = find_nearest(dnpPowerMatFile[0], result.expTime - dnpFirstTime)
+                result.powerDbm = float(dnpPowerMatFile[1][timeInd])
+                result.powerMw = 10.0 ** ((result.powerDbm + 24.445) / 10.0)
+            elif result.expType == 't1' and matFiles:
+                if t1Counter == 0: t1FirstTime = result.expTime - float(t1PowerMatFile[0][0])
+                result.powerDbm = float(
+                    t1PowerMatFile[1][find_nearest(t1PowerMatFile[0], result.expTime - t1FirstTime)[0]])
+                result.powerMw = 10.0 ** ((result.powerDbm + 24.445) / 10.0)
+
+        if not result.powerMw:
             result.powerMw = 10.0 ** ((result.powerDbm + 19.4639) / 10.0)
         if result.expType == 'dnp':
             if dnpCounter == 0:
@@ -939,6 +989,7 @@ def return_exps(path, **kwargs):
                              result.powerDbm,
                              result.t1fit['t1'],
                              result.t1fit['t1error']])
+            t1Counter += 1
         print("Evaluated {}\t of type {}\t @{:.3f} W".format(
             result.title, result.expType, result.powerMw / 1000))
         results.append(result)
@@ -1108,7 +1159,7 @@ def make_figures(results, path='', **kwargs):
             ax4.grid(True)
             ax4.set_xlim(value.maxFreq - value.ftWindow,
                          value.maxFreq + value.ftWindow)
-            ax7.plot(value.frequency, np.abs(value.allFid[5][0]) * value.real[1] / np.abs(value.real[1]), label=(
+            ax7.plot(value.frequency, np.abs(value.allFid[5][0]) * value.real[1][0] / np.abs(value.real[1][0]), label=(
                 '{:.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())
             ax7.set_title('FT after phasing to %.0f degrees' % value.ph)
             ax7.grid(True)
@@ -1273,17 +1324,18 @@ def make_figures(results, path='', **kwargs):
         ax13d.set_ylabel('Experiment index')
         # 3D plots for FIDs
         [ax13d.plot3D(value.fidTimeHistory['bZeroFilling'], np.abs(value.allFid[1][0]), value.expNum, zdir='y',
-                     zorder=int(-value.expNum), color=colors[i]) for i, value in enumerate(results) if value.expType == 'dnp']
+                      zorder=int(-value.expNum), color=colors[i]) for i, value in
+         enumerate(x for x in results if x.expType == 'dnp')]
         xmin, xmax = min([min(a.fidTimeHistory['bZeroFilling']) for a in results if a.expType == 'dnp']), max(
             [max(a.fidTimeHistory['bZeroFilling']) for a in results if a.expType == 'dnp'])
         zmin, zmax = min([min(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp']), max(
             [max(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp'])
         zs = [a.expNum for a in results if a.expType == 'dnp']
         labels = ['{:d} ({:.2f} W)'.format(int(a.expNum), a.powerMw / 1000) for a in results if a.expType == 'dnp']
-        plt.yticks(range(int(min(zs)), int(max(zs) + 1), int(len(zs) / (max(zs) - min(zs)))), labels,
+        plt.yticks(zs, labels,
                    rotation=270)
         for i, label in enumerate(ax13d.get_yticklabels()):
-            label.set_color(colors[i])
+            if label.get_text(): label.set_color(colors[i])
         ax13d.grid(True)
         ax13d.set_xlim3d(xmin, xmax)
         ax13d.set_zlim3d(zmin, zmax)
@@ -1308,9 +1360,9 @@ def make_figures(results, path='', **kwargs):
                  results if a.expType == 'dnp']
         poly = PolyCollection(verts, facecolors=colors)
         poly.set_alpha(0.6)
-        plt.yticks(range(int(min(zs)), int(max(zs) + 1), int(len(zs) / (max(zs) - min(zs)))), labels, rotation=270)
+        plt.yticks(zs, labels, rotation=270)
         for i, label in enumerate(ax43d.get_yticklabels()):
-            label.set_color(colors[i])
+            if label.get_text(): label.set_color(colors[i])
         ax43d.view_init(elev=17., azim=-23.)
         ax43d.grid(True)
         ax43d.set_xlim3d(xmin, xmax)
@@ -1331,17 +1383,18 @@ def make_figures(results, path='', **kwargs):
         ax73d.set_zlabel('Intensity (a.u.)')
         ax73d.set_ylabel('Experiment index')
         verts = [list(zip(a.frequency[np.logical_and(a.frequency > xmin, a.frequency < xmax)], (
-                    np.abs(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]) * a.real[1] / np.abs(
-                a.real[1])))) for a in results if a.expType == 'dnp']
+                np.abs(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]) * a.real[1][0] / np.abs(
+            a.real[1][0])))) for a in results if a.expType == 'dnp']
         zmin, zmax = min(
-            [min(np.real(a.allFid[5][0]) * a.real[1] / np.abs(a.real[1])) for a in results if a.expType == 'dnp']), max(
-            [max(np.real(a.allFid[5][0]) * a.real[1] / np.abs(a.real[1])) for a in results if a.expType == 'dnp'])
+            [min(np.abs(a.allFid[5][0]) * a.real[1][0] / np.abs(a.real[1][0])) for a in results if
+             a.expType == 'dnp']), max(
+            [max(np.abs(a.allFid[5][0]) * a.real[1][0] / np.abs(a.real[1][0])) for a in results if a.expType == 'dnp'])
         zs = [a.expNum for a in results if a.expType == 'dnp']
         poly = PolyCollection(verts, facecolors=colors)
         poly.set_alpha(0.6)
-        plt.yticks(range(int(min(zs)), int(max(zs) + 1), int(len(zs) / (max(zs) - min(zs)))), labels, rotation=270)
+        plt.yticks(zs, labels, rotation=270)
         for i, label in enumerate(ax73d.get_yticklabels()):
-            label.set_color(colors[i])
+            if label.get_text(): label.set_color(colors[i])
         ax73d.grid(True)
         ax73d.set_xlim3d(xmin, xmax)
         ax73d.set_zlim3d(zmin, zmax)
@@ -1351,7 +1404,7 @@ def make_figures(results, path='', **kwargs):
         ax73d.view_init(elev=17., azim=-23.)
         ax73d.yaxis.labelpad = 45
         ax73d.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
-        #fig73d.colorbar(test)
+        # fig73d.colorbar(test)
         fig73d.tight_layout()
         [fig73d.savefig(os.path.join(path, evalPath, ('06_FT_after_phasing_magn_3d.' + x)), dpi=plotDpi)
          for x in plotExts]
@@ -1544,3 +1597,8 @@ def fit_t1_series(power, t1, t1error=0, degree=1, spaceNo=500):
 
 def cc(arg):
     return mcolors.to_rgba(arg, alpha=0.6)
+
+
+def find_nearest(array, values):
+    indices = np.abs(np.subtract.outer(array, values)).argmin(0)
+    return indices, array[indices]
