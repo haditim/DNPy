@@ -30,7 +30,7 @@ class AppWindow(baseUIWidget, baseUIClass):
         phase = ''
         if self.apCombo.currentText() == "First experiment":
             phase = 'first'
-        elif self.apCombo.currentText() == "All experimn":
+        elif self.apCombo.currentText() == "All experiments":
             phase = 'all'
         elif self.apCombo.currentText() == "No auto phasing":
             phase = 'none'

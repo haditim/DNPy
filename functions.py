@@ -325,6 +325,24 @@ class NMRData(object):
             phaseFactor = np.exp(-1j * phase)
         self.allFid[toPos] = [fid * phaseFactor for fid in self.allFid[fromPos]]
 
+    
+    def auto_phase(self, fromPos, toPos, index, start, stop, scale="Hz"):
+        """This function should get fromPos and index pointing to a spectrum.
+        It returns the phase for minimizing the integral over the imag. part
+        in the spectral region of interest, in degrees. HADI: It puts the result of
+        phasing to toPos"""
+
+        i1, i2 = self.get_indices([start, stop], scale=scale)
+        phiTest = np.linspace(0, 359, num=360)
+        integrals = np.zeros(np.size(phiTest))
+        for k in range(len(integrals)):
+            integrals[k] = np.sum(np.imag(
+                self.allFid[fromPos][index][i1:i2] * np.exp(-1j * float(phiTest[k]) / 180. * np.pi)))
+        magnMin = np.argmin(integrals) + (np.argmax(integrals) - np.argmin(integrals))//2
+        self.phase(fromPos, toPos, phiTest[magnMin])
+        return phiTest[magnMin]   
+    
+    
     def auto_phase0(self, fromPos, toPos, index, start, stop, scale="Hz"):
         """This function should get fromPos and index pointing to a spectrum.
         It returns the phase for maximimizing the integral over the real part
@@ -703,6 +721,8 @@ class NMRData(object):
                 scale="Hz",
                 part="magnitude"
             )
+            if self.debug:
+                print("Center frequency for this exp.: {}".format(self.maxFreq))
             if i % (self.phaseCycles) == 0:  # appending time values
                 if vdListLen > 1:
                     self.real[0].append(self.vdList[int(i / self.phaseCycles)])
@@ -881,9 +901,14 @@ def return_exps(path, **kwargs):
                 result = NMRData(os.path.join(path, str(name).split('.')[0]),
                                  "TopSpin", autoPhase=True, ph=0, **kwargs)
                 ph = result.ph
+                if debug:
+                    print("Phase: {}".format(ph))
+            elif phase == 'none':
+                result = NMRData(os.path.join(path, str(name).split('.')[0]),
+                                     "TopSpin", autoPhase=True, ph=0, **kwargs)
+                ph = 0
             else:
                 try:
-                    if ph: ph = ph
                     result = NMRData(os.path.join(path, str(name).split('.')[0]),
                                      "TopSpin", autoPhase=False, ph=ph, **kwargs)
                 except:
@@ -990,8 +1015,8 @@ def return_exps(path, **kwargs):
                              result.t1fit['t1'],
                              result.t1fit['t1error']])
             t1Counter += 1
-        print("Evaluated {}\t of type {}\t @{:.3f} W".format(
-            result.title, result.expType, result.powerMw / 1000))
+        print("Evaluated {}: {}({})\t @{:.3f}W, phase {}".format(
+            int(result.expNum), result.title, result.expType, result.powerMw / 1000, int(ph)))
         results.append(result)
     if process:
         print(r"Fitting enhancement")
@@ -1018,13 +1043,15 @@ def return_exps(path, **kwargs):
             # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
             kSigmaFit = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
             kwargs['kSigmaFit'] = kSigmaFit
+    
+    if dumpToCsv:
+        print('Saving CSV files...')
+        dumpAllToCSV(results, path=path, **kwargs)
+
     if plotExts:
         print('Plotting evaluation figures...')
         make_figures(results, path=path, **kwargs)
 
-    if dumpToCsv:
-        print('Saving CSV files...')
-        dumpAllToCSV(results, path=path, **kwargs)
     print('All done')
     return results
 
@@ -1292,7 +1319,7 @@ def make_figures(results, path='', **kwargs):
     ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
     ax6.set_xlabel('Power (mW)')
     ax6.set_ylabel('FT Integral, normalized to MW off')
-    print("saving figures in %s" % os.path.join(path, evalPath))
+    print("saving figures in {}".format(os.path.join(path, evalPath)))
     # saving figures in evaluation directory
     ax0.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
     fig0.tight_layout()
