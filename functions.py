@@ -897,24 +897,15 @@ def return_exps(path, **kwargs):
     # Preparing experiment data
     for i, name in enumerate(dirs):
         try:
-            if (phase == 'first' and dnpCounter == 0) or phase == 'all':
+            if (phase == 'first' and dnpCounter == 0) or phase == 'all' or phase == 'none':
                 result = NMRData(os.path.join(path, str(name).split('.')[0]),
                                  "TopSpin", autoPhase=True, ph=0, **kwargs)
-                ph = result.ph
                 if debug:
                     print("Phase: {}".format(ph))
-            elif phase == 'none':
-                result = NMRData(os.path.join(path, str(name).split('.')[0]),
-                                     "TopSpin", autoPhase=True, ph=0, **kwargs)
-                ph = 0
             else:
-                try:
-                    result = NMRData(os.path.join(path, str(name).split('.')[0]),
-                                     "TopSpin", autoPhase=False, ph=ph, **kwargs)
-                except:
-                    result = NMRData(os.path.join(path, str(name).split('.')[0]),
-                                     "TopSpin", autoPhase=True, ph=0, **kwargs)
-                    ph = result.ph
+                result = NMRData(os.path.join(path, str(name).split('.')[0]),
+                                 "TopSpin", autoPhase=False, ph=ph, **kwargs)
+            ph = result.ph
         except Exception as e:
             print("Problem adding exp {}. The error is: {}".format(int(name), e))
             if debug:
