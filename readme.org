@@ -6,6 +6,8 @@
 
 * Sample output
 #+attr_html: :width 100%
+[[https://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/c8/1e/c81e7f88-2403-4324-ae6c-37762452fb32/06_ft_after_phasing_magn_3d.jpg__3250x2000_q85_crop_subsampling-2_upscale.jpg]]
+#+attr_html: :width 100%
 [[http://www.spintoolbox.com/media/filer_public_thumbnails/filer_public/ad/43/ad43ea9a-c23a-42d4-a7e8-2b5bbe76a637/dnpyoutput.jpg__1000x562_q85_subsampling-2_upscale.jpg]]
 
 * Experiments naming style
