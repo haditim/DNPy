@@ -6,22 +6,23 @@ from functions import *
 import re
 
 
-baseUIClass, baseUIWidget = uic.loadUiType(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ui', 'DNPyUI.ui'))
+baseUIClass, baseUIWidget = uic.loadUiType(os.path.join(
+    os.path.dirname(os.path.realpath(__file__)), 'ui', 'DNPyUI.ui'))
 
 
 class AppWindow(baseUIWidget, baseUIClass):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self.setupUi(self)
-        self.label_4.setText('<img src=\"'+os.path.join('ui', 'logo_red_shade_nostroke_120_small.png')+'\" />')
-        self.label_5.setText('<a href=\"http://www.spintoolbox.com/\"><span style=\" text-decoration: underline; color:#0000ff;\">SpinToolbox.com</span></a>')
+        self.label_4.setText('<img src=\"'+os.path.join('ui',
+                                                        'logo_red_shade_nostroke_120_small.png')+'\" />')
+        self.label_5.setText(
+            '<a href=\"http://www.spintoolbox.com/\"><span style=\" text-decoration: underline; color:#0000ff;\">SpinToolbox.com</span></a>')
         self.label_5.setOpenExternalLinks(True)
         self.pathButton.clicked.connect(self.open_exp_path)
         self.toolButton.clicked.connect(self.open_exp_powers)
         self.cancelButton.clicked.connect(QCoreApplication.instance().quit)
         self.startButton.clicked.connect(self.start)
-
-
 
     def start(self):
         sys.stdout = EmittingStream(textWritten=self.normalOutputWritten)
@@ -61,8 +62,8 @@ class AppWindow(baseUIWidget, baseUIClass):
         makeFigs = self.makeFigs.isChecked()
         plotExts = []
         if makeFigs:
-            for index, val in enumerate(['jpg','png','pdf','eps']):
-                if getattr(self,val).isChecked():
+            for index, val in enumerate(['jpg', 'png', 'pdf', 'eps']):
+                if getattr(self, val).isChecked():
                     plotExts.append(val)
         figWidth = self.figWidth.value()
         figHeight = self.figHeight.value()
@@ -112,12 +113,13 @@ class AppWindow(baseUIWidget, baseUIClass):
         # Maybe QTextEdit.append() works as well, but this is how I do it:
         self.resultsBrowser.append(text)
 
-
-
     def open_exp_path(self):
-        self.path.setText(str(QFileDialog.getExistingDirectory(self, "Select Experiment Directory")))
+        self.path.setText(str(QFileDialog.getExistingDirectory(
+            self, "Select Experiment Directory")))
+
     def open_exp_powers(self):
-        self.powerFile.setText(str(QFileDialog.getOpenFileName(self, "Select Powers CSV File","","csv files (*.csv)")[0]))
+        self.powerFile.setText(str(QFileDialog.getOpenFileName(
+            self, "Select Powers CSV File", "", "csv files (*.csv)")[0]))
 
     def onDataReady(self, exps):
         self.exps = exps
@@ -144,6 +146,7 @@ class AppWindow(baseUIWidget, baseUIClass):
 class Thread(QThread):
     dataReady = pyqtSignal(list)
     errorEval = pyqtSignal(str)
+
     def __init__(self, path, kwargs):
         super().__init__()
         self.path = path
@@ -159,23 +162,26 @@ class Thread(QThread):
             exps = return_exps(self.path, **self.kwargs)
             self.dataReady.emit(exps)
         except Exception as e:
-            self.errorEval.emit('<span style=\'font-size: 12px; color:red;\'><b>' \
-                                                    'There was an error evaluating your data ('+str(e)+')</b></span>')
-
+            self.errorEval.emit('<span style=\'font-size: 12px; color:red;\'><b>'
+                                'There was an error evaluating your data ('+str(e)+')</b></span>')
 
 
 class EmittingStream(QObject):
 
     textWritten = pyqtSignal(str)
+
     def write(self, text):
         if 'Evaluate' in text:
-            self.textWritten.emit(str('<span style=\'font-size: 11px; color:green; margin-bottom:-20px;;\'><b>'+text+'</b></span>'))
+            self.textWritten.emit(str(
+                '<span style=\'font-size: 11px; color:green; margin-bottom:-20px;;\'><b>'+text+'</b></span>'))
         elif 'Error' in text:
-            self.textWritten.emit(str('<span style=\'font-size: 12px; color:red;\'><b>'+text+'</b></span>'))
+            self.textWritten.emit(
+                str('<span style=\'font-size: 12px; color:red;\'><b>'+text+'</b></span>'))
         else:
-            self.textWritten.emit(str('<span style=\'font-size: 12px;\'>'+text+'</span>'))
+            self.textWritten.emit(
+                str('<span style=\'font-size: 12px;\'>'+text+'</span>'))
 
-        
+
 def main():
     app = QApplication(sys.argv)
     w = AppWindow()
