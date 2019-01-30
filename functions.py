@@ -134,7 +134,8 @@ class NMRData(object):
                             self.parDictionary["time"] = line[2].strip()
                         except Exception as e:
                             if self.debug:
-                                print('error {} happened setting date of experiment'.format(e))
+                                print(
+                                    'error {} happened setting date of experiment'.format(e))
                             pass
                     elif line[0] == "##$D":
                         delays1 = acqusFile.readline().strip()
@@ -199,13 +200,15 @@ class NMRData(object):
             self.sizeTD2 = len(self.data) / self.sizeTD1 / 2
 
             dwellTime = 1. / self.sweepWidthTD2
-            self.fidTime = np.linspace(0, (self.sizeTD2 - 1) * dwellTime, num=self.sizeTD2)
+            self.fidTime = np.linspace(
+                0, (self.sizeTD2 - 1) * dwellTime, num=self.sizeTD2)
 
             # here we create one array of complex numbers for each of the FIDs
             # i runs over all fids in a ser file, in case of a fid file i = 0
             # TD1 is number of FIDs, TD2 is number of datapoints in each FID
             for i in range(0, self.sizeTD1):
-                realPart = self.data[int(i * self.sizeTD2 * 2):int((i + 1) * self.sizeTD2 * 2):2]
+                realPart = self.data[int(
+                    i * self.sizeTD2 * 2):int((i + 1) * self.sizeTD2 * 2):2]
                 imagPart = sp.multiply(
                     self.data[int(i * self.sizeTD2 * 2 + 1):
                               int((i + 1) * self.sizeTD2 * 2 + 1):2], 1j)
@@ -243,14 +246,17 @@ class NMRData(object):
             print("len allFid: ", len(self.allFid))
             print("len allFid[0]: ", len(self.allFid[0]))
             print("===============================================================")
-            print("len allFid[0][" + str(whichFid) + "]: ", len(self.allFid[0][0]))
+            print("len allFid[0][" + str(whichFid) + "]: ",
+                  len(self.allFid[0][0]))
         oReal = np.mean(np.real(self.allFid[fromPos][whichFid][startOffset:]))
-        stdReal = np.std(np.real(self.allFid[fromPos][whichFid][startOffset:]) - oReal)
+        stdReal = np.std(
+            np.real(self.allFid[fromPos][whichFid][startOffset:]) - oReal)
         if self.debug:
             print("offsetReal: ", oReal)
             print("stdReal: ", stdReal)
         oImag = np.mean(np.imag(self.allFid[fromPos][whichFid][startOffset:]))
-        stdImag = np.std(np.imag(self.allFid[fromPos][whichFid][startOffset:]) - oImag)
+        stdImag = np.std(
+            np.imag(self.allFid[fromPos][whichFid][startOffset:]) - oImag)
         if self.debug:
             print("offsetImag: ", oImag)
             print("stdImag: ", stdImag)
@@ -272,7 +278,8 @@ class NMRData(object):
             self.allFid[toPos] = np.array(
                 [fftshift(fft(self.allFid[fromPos][fidIndex])) for fidIndex in only])
         else:
-            self.allFid[toPos] = np.array([fftshift(fft(fid)) for fid in self.allFid[fromPos]])
+            self.allFid[toPos] = np.array(
+                [fftshift(fft(fid)) for fid in self.allFid[fromPos]])
 
         self.frequency = np.linspace(
             -self.sweepWidthTD2 / 2, self.sweepWidthTD2 / 2, len(self.allFid[fromPos][0]))
@@ -309,13 +316,15 @@ class NMRData(object):
                 self.allFid[fromPos][k][min(indices):max(indices)] -= p(
                     self.frequency[min(indices):max(indices)])
             else:
-                self.allFid[toPos].append(self.allFid[fromPos][k] - p(self.frequency))
+                self.allFid[toPos].append(
+                    self.allFid[fromPos][k] - p(self.frequency))
 
     def baseline_correction_mean(self, fromPos, toPos, totalPoints):
         """HADI: baseline_correction does not work on our data. this is a simple mean correction."""
 
         self.check_to_pos(toPos)
-        self.allFid[toPos] = [k - np.mean(k[len(k) - totalPoints:]) for k in self.allFid[fromPos]]
+        self.allFid[toPos] = [
+            k - np.mean(k[len(k) - totalPoints:]) for k in self.allFid[fromPos]]
 
     def phase(self, fromPos, toPos, phase, degree=True):
         self.check_to_pos(toPos)
@@ -323,9 +332,9 @@ class NMRData(object):
             phaseFactor = np.exp(-1j * float(phase) / 180. * np.pi)
         else:
             phaseFactor = np.exp(-1j * phase)
-        self.allFid[toPos] = [fid * phaseFactor for fid in self.allFid[fromPos]]
+        self.allFid[toPos] = [
+            fid * phaseFactor for fid in self.allFid[fromPos]]
 
-    
     def auto_phase(self, fromPos, toPos, index, start, stop, scale="Hz"):
         """This function should get fromPos and index pointing to a spectrum.
         It returns the phase for minimizing the integral over the imag. part
@@ -338,11 +347,11 @@ class NMRData(object):
         for k in range(len(integrals)):
             integrals[k] = np.sum(np.imag(
                 self.allFid[fromPos][index][i1:i2] * np.exp(-1j * float(phiTest[k]) / 180. * np.pi)))
-        magnMin = np.argmin(integrals) + (np.argmax(integrals) - np.argmin(integrals))//2
+        magnMin = np.argmin(integrals) + \
+            (np.argmax(integrals) - np.argmin(integrals))//2
         self.phase(fromPos, toPos, phiTest[magnMin])
-        return phiTest[magnMin]   
-    
-    
+        return phiTest[magnMin]
+
     def auto_phase0(self, fromPos, toPos, index, start, stop, scale="Hz"):
         """This function should get fromPos and index pointing to a spectrum.
         It returns the phase for maximimizing the integral over the real part
@@ -411,14 +420,16 @@ class NMRData(object):
         self.fidTimeHistory['bZeroFilling'] = self.fidTime
         self.fidTime = np.linspace(0, (len(self.fidTime)
                                        - 1 + totalPoints) * self.dwellTime, num=len(self.fidTime)
-                                                                                + totalPoints)
+                                   + totalPoints)
 
     def get_joined_partial_spectra(self, fromPos, start, stop, scale="Hz", returnX=False):
         spectra = []
         for index in range(self.sizeTD1):
-            spectra.extend(self.get_partial_spectrum(fromPos, index, start, stop, scale=scale))
+            spectra.extend(self.get_partial_spectrum(
+                fromPos, index, start, stop, scale=scale))
         if returnX:
-            x = np.array(list(range(len(spectra)))) * self.sizeTD1 / float(len(spectra)) + 0.5
+            x = np.array(list(range(len(spectra)))) * \
+                self.sizeTD1 / float(len(spectra)) + 0.5
             return x, spectra
         else:
             return spectra
@@ -541,7 +552,8 @@ class NMRData(object):
 
         assert start < stop, "start should be smaller than stop"
         assert penalty > 0, "penalty shoud be possitive"
-        assert type(derivative) is int, "derivative should be a (small possitive) integer"
+        assert type(
+            derivative) is int, "derivative should be a (small possitive) integer"
         assert derivative > 0, "need derivative > 0"
         spectrum = np.array(self.allFid[fromPos][index])
         # normalize the spectrum:
@@ -568,8 +580,10 @@ class NMRData(object):
                                    args=(spectrum, derivative, penalty,))
         if self.debug:
             spectrum = self.__phase01(spectrum, res.x)
-            print('penalty change:', self.__penalty(spectrum, penalty) - penalty_start)
-            print('entropy change:', self.__entropy(spectrum, derivative) - entropy_start)
+            print('penalty change:', self.__penalty(
+                spectrum, penalty) - penalty_start)
+            print('entropy change:', self.__entropy(
+                spectrum, derivative) - entropy_start)
         return res.x
 
     def phase01(self, fromPos, toPos, correction):
@@ -645,7 +659,8 @@ class NMRData(object):
         # delete whatever is in toPos:
         self.allFid[toPos] = []
         # scaling factor:
-        factor = float(self.parDictionary["$NS"]) * float(self.parDictionary["$RG"]) * scaling
+        factor = float(self.parDictionary["$NS"]) * \
+            float(self.parDictionary["$RG"]) * scaling
         for spectrum in self.allFid[fromPos]:
             self.allFid[toPos].append([point / factor for point in spectrum])
 
@@ -696,13 +711,15 @@ class NMRData(object):
             vdListLen = 1
         self.real = [[] for i in range(0, int(self.phaseCycles + 1))]
         self.magn = [[] for i in range(0, int(self.phaseCycles + 1))]
-        self.phC = [[] for i in range(0, 3)]  # power, phasecycled real, phasecycles magn.
+        # power, phasecycled real, phasecycles magn.
+        self.phC = [[] for i in range(0, 3)]
         try:
             self.fwhm = fwhm(self.frequency, np.real(self.allFid[5][0]))
         except Exception:
             self.fwhm = None
         for i in range(len(self.allFid[0])):  # calculate the integral
-            if (self.expType == 't1' and i == 0) or self.expType == 'dnp':  # HADI: hack for T1 integration problems
+            # HADI: hack for T1 integration problems
+            if (self.expType == 't1' and i == 0) or self.expType == 'dnp':
                 self.maxValInd, self.maxFreq = self.get_center_frequency(
                     5, i, min(self.frequency), max(self.frequency))
             if not -self.maxWin < self.maxFreq < self.maxWin:
@@ -714,14 +731,6 @@ class NMRData(object):
                 self.maxFreq + self.ftWindow,
                 scale="Hz",
                 part="real"
-            )
-            calIntImag = self.integrate(
-                5,
-                i,
-                self.maxFreq - self.ftWindow,
-                self.maxFreq + self.ftWindow,
-                scale="Hz",
-                part="imag"
             )
             calIntMagn = self.integrate(
                 5,
@@ -747,10 +756,10 @@ class NMRData(object):
                 self.phC[2].append(0)
             # Appending integral values
             self.real[int(i % self.phaseCycles) + 1].append(calIntReal)
-            self.magn[int(i % self.phaseCycles) + 1].append(-calIntMagn * calIntImag / abs(calIntImag))
+            self.magn[int(i % self.phaseCycles) + 1].append(calIntMagn)
         # phase cycling
         self.phaseCSigns = [+1 if i < self.phaseCycles /
-                                  2. else -1 for i in range(0, int(self.phaseCycles))]
+                            2. else -1 for i in range(0, int(self.phaseCycles))]
         self.phC = np.asarray(self.phC)
         for i in range(1, int(self.phaseCycles + 1)):
             # real channel
@@ -790,7 +799,8 @@ def fwhm(x, y):
         if biggerCondition[k + 1] != biggerCondition[k]:
             changePoints.append(k)
 
-    assert len(changePoints) == 2, "More than two crossings of the threshold found."
+    assert len(
+        changePoints) == 2, "More than two crossings of the threshold found."
 
     for k in changePoints:
         # do a polyfit
@@ -827,13 +837,10 @@ def return_exps(path, **kwargs):
     filesInDir = os.listdir(path)
     dirs = []
     results = []
-    dnpEnh = []  # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
-    t1Series = []
-    dnpCounter = 0
-    t1Counter = 0
-    powerMw = -1
     attPower = [[], []]
     evalPath = kwargs.get('evalPath', 'eval')
+    dnpCounter = 0
+    t1Counter = 0
     try:  # Taking care of evaluation dir
         os.mkdir(os.path.join(path, evalPath))
     except Exception as e:
@@ -900,8 +907,10 @@ def return_exps(path, **kwargs):
                 os.path.join(path, [i for i in mainFiles if i.endswith('.mat') and 't1' in i][0]))
             dnpPowerMatFile = sio.loadmat(
                 os.path.join(path, [i for i in mainFiles if i.endswith('.mat') and 't1' not in i][0]))
-            t1PowerMatFile = np.asarray((t1PowerMatFile['timelist'], t1PowerMatFile['powerlist']))
-            dnpPowerMatFile = np.asarray((dnpPowerMatFile['timelist'], dnpPowerMatFile['powerlist']))
+            t1PowerMatFile = np.asarray(
+                (t1PowerMatFile['timelist'], t1PowerMatFile['powerlist']))
+            dnpPowerMatFile = np.asarray(
+                (dnpPowerMatFile['timelist'], dnpPowerMatFile['powerlist']))
 
     attPower = np.asarray(attPower)
     # Preparing experiment data
@@ -909,14 +918,15 @@ def return_exps(path, **kwargs):
         try:
             if (phase == 'first' and dnpCounter == 0) or phase == 'all':
                 result = NMRData(os.path.join(path, str(name).split('.')[0]),
-                                 "TopSpin", autoPhase=True, ph=0, **kwargs)          
+                                 "TopSpin", autoPhase=True, ph=0, **kwargs)
             else:
-                if phase == 'none': ph = 0
+                if phase == 'none':
+                    ph = 0
                 result = NMRData(os.path.join(path, str(name).split('.')[0]),
                                  "TopSpin", autoPhase=False, ph=ph, **kwargs)
             ph = result.ph
             if debug:
-                    print("Phase: {}".format(ph))
+                print("Phase: {}".format(ph))
         except Exception as e:
             print("Problem adding exp {}. The error is: {}".format(int(name), e))
             if debug:
@@ -959,60 +969,35 @@ def return_exps(path, **kwargs):
                         print('I could not find power for {:.0f} dB and I won\'t be using it'.
                               format(result.dbSet))
             elif result.expType == 'dnp' and matFiles:
-                if dnpCounter == 0: dnpFirstTime = result.expTime - float(dnpPowerMatFile[0][0])
+                if dnpCounter == 0:
+                    dnpFirstTime = result.expTime - \
+                        float(dnpPowerMatFile[0][0])
                 if debug:
                     print('exp time: ', datetime.datetime.fromtimestamp(result.expTime),
-                          ' time diff: ', datetime.datetime.fromtimestamp(result.expTime - dnpFirstTime),
+                          ' time diff: ', datetime.datetime.fromtimestamp(
+                              result.expTime - dnpFirstTime),
                           ' dnpCounter: ', dnpCounter,
                           ' dir: ', name)
-                timeInd, time = find_nearest(dnpPowerMatFile[0], result.expTime - dnpFirstTime)
+                timeInd, time = find_nearest(
+                    dnpPowerMatFile[0], result.expTime - dnpFirstTime)
                 result.powerDbm = float(dnpPowerMatFile[1][timeInd])
                 result.powerMw = 10.0 ** ((result.powerDbm + 24.445) / 10.0)
             elif result.expType == 't1' and matFiles:
-                if t1Counter == 0: t1FirstTime = result.expTime - float(t1PowerMatFile[0][0])
+                if t1Counter == 0:
+                    t1FirstTime = result.expTime - float(t1PowerMatFile[0][0])
                 result.powerDbm = float(
                     t1PowerMatFile[1][find_nearest(t1PowerMatFile[0], result.expTime - t1FirstTime)[0]])
                 result.powerMw = 10.0 ** ((result.powerDbm + 24.445) / 10.0)
 
         if not result.powerMw:
             result.powerMw = 10.0 ** ((result.powerDbm + 19.4639) / 10.0)
-        if result.expType == 'dnp':
-            if dnpCounter == 0:
-                normReal = result.real[1][0]
-                normMagn = result.magn[1][0]
-            if result.powerMw >= powerMw:
-                # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
-                dnpEnh.append([result.expNum,
-                               result.powerMw,
-                               result.powerDbm,
-                               result.real[1][0],
-                               result.real[1][0] / normReal,
-                               result.magn[1][0],
-                               result.magn[1][0] / normMagn,
-                               1])
-            else:
-                dnpEnh.append([result.expNum,
-                               result.powerMw,
-                               result.powerDbm,
-                               result.real[1][0],
-                               result.real[1][0] / normReal,
-                               result.magn[1][0],
-                               result.magn[1][0] / normMagn,
-                               0])
-            dnpCounter += 1
-            powerMw = result.powerMw
-        elif result.expType == 't1':
-            # expNum, powerMw, powerDbm, t1, t1error
-            t1Series.append([result.expNum,
-                             result.powerMw,
-                             result.powerDbm,
-                             result.t1fit['t1'],
-                             result.t1fit['t1error']])
-            t1Counter += 1
         print("Evaluated {}: {}({})\t @{:.3f}W, phase {}".format(
             int(result.expNum), result.title, result.expType, result.powerMw / 1000, int(ph)))
         results.append(result)
+
     if process:
+        dnpEnh = calculate_dnp_enh(results)
+        t1Series = calculate_t1_series(results)
         print(r"Fitting enhancement")
         dnpEnh = np.asarray(dnpEnh)
         enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
@@ -1020,7 +1005,8 @@ def return_exps(path, **kwargs):
         kwargs['enhancementFit'] = enhancementFit
         if t1SeriesEval or kSigmaCalc:
             if not t1Series:
-                print('Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
+                print(
+                    'Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
                 t1SeriesEval = False
                 kwargs['t1SeriesEval'] = False
                 kSigmaCalc = False
@@ -1030,14 +1016,16 @@ def return_exps(path, **kwargs):
                 t1Series = np.asarray(t1Series)
                 kwargs['t1Series'] = t1Series
                 t1SeriesPolDeg = kwargs.get('t1SeriesPolDeg', 1)
-                t1FitSeries = fit_t1_series(t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
+                t1FitSeries = fit_t1_series(
+                    t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
                 kwargs['t1FitSeries'] = t1FitSeries
         if kSigmaCalc and t1SeriesEval:
             print(r"Fitting kSigma")
             # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
-            kSigmaFit = k_sigma_calc(dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
+            kSigmaFit = k_sigma_calc(
+                dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
             kwargs['kSigmaFit'] = kSigmaFit
-    
+
     if dumpToCsv:
         print('Saving CSV files...')
         dumpAllToCSV(results, path=path, **kwargs)
@@ -1067,7 +1055,8 @@ def dumpAllToCSV(results, path, **kwargs):
                    header=('expNum\tpowerMw\tpowerDbm\tt1\tt1error'))
         if kSigmaCalc:
             np.savetxt(os.path.join(path, evalPath, 'ksigma.csv'),
-                       np.asarray((dnpEnh[:, 1], kSigmaFit['kSigmaCor'], kSigmaFit['kSigmaUncor'])).transpose(),
+                       np.asarray(
+                           (dnpEnh[:, 1], kSigmaFit['kSigmaCor'], kSigmaFit['kSigmaUncor'])).transpose(),
                        delimiter='\t', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
 
 
@@ -1094,7 +1083,8 @@ def make_figures(results, path='', **kwargs):
     ax0.set_ylabel('Signal (a.u.)')
     fig1 = plt.figure(figsize=figSize)
     ax1 = fig1.add_subplot(111)
-    ax1.set_title('NMR FIDs after digital filter removal and offset/baseline correction (real)')
+    ax1.set_title(
+        'NMR FIDs after digital filter removal and offset/baseline correction (real)')
     ax1.set_xlabel('time (ms)')
     ax1.set_ylabel('Signal (a.u.)')
     fig2 = plt.figure(figsize=figSize)
@@ -1109,12 +1099,14 @@ def make_figures(results, path='', **kwargs):
     ax3.set_ylabel('Signal (a.u.)')
     fig4 = plt.figure(figsize=figSize)
     ax4 = fig4.add_subplot(111)
-    ax4.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax4.legend(loc='upper right', fancybox=True,
+               shadow=True, fontsize='x-small')
     ax4.set_xlabel('Frequency offset (Hz)')
     ax4.set_ylabel('Intensity (a.u.)')
     fig7 = plt.figure(figsize=figSize)
     ax7 = fig7.add_subplot(111)
-    ax7.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax7.legend(loc='upper right', fancybox=True,
+               shadow=True, fontsize='x-small')
     ax7.set_xlabel('Frequency offset (Hz)')
     ax7.set_ylabel('Intensity (a.u.)')
     fig5 = plt.figure(figsize=figSize)  # time vs centerFreq
@@ -1131,35 +1123,44 @@ def make_figures(results, path='', **kwargs):
     inter = interp1d([min(powers), max(powers)], [0, 1])
     colors = [cm.jet(inter(x)) for x in powers]
     # DNP enhancement
-    ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7] == 1][:, 6], 'bo', marker="o", label='forward magn.')
-    ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7] == 0][:, 6], 'ro', marker="o", label='backward magn')
-    ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7] == 1][:, 4], 'bo', marker="x", label='forward real')
-    ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7] == 0][:, 4], 'ro', marker="x", label='backward real')
+    ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
+                                                     == 1][:, 6], 'bo', marker="o", label='forward magn.')
+    ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
+                                                     == 0][:, 6], 'ro', marker="o", label='backward magn')
+    ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
+                                                     == 1][:, 4], 'bo', marker="x", label='forward real')
+    ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
+                                                     == 0][:, 4], 'ro', marker="x", label='backward real')
     for i in range(0, len(dnpEnh[:, 0])):
         if dnpEnh[i, 7] == 1:
             ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
                          xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                         xytext=(dnpEnh[i, 1] + (max(dnpEnh[:, 1]) - min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
+                         xytext=(dnpEnh[i, 1] + (max(dnpEnh[:, 1]) -
+                                                 min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
                          va='center', ha='left', size=9, color='blue', alpha=0.6)
         elif dnpEnh[i, 7] == 0:
             ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
                          xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                         xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) - min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
+                         xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) -
+                                                 min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
                          va='center', ha='right', size=9, color='red', alpha=0.6)
     ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--',
              label='(magn.) ' + enhancementFit['enhancementFormula'])
     ax6.plot(enhancementFit['xdata'], enhancementFit['ydataExp'], 'g--',
              label='(magn.) ' + enhancementFit['enhancementFormulaExp'])
-    ax6.annotate(enhancementFit['annotation'], xy=(0.4, 0.5), xycoords='axes fraction', color='blue')
-    ax6.annotate(enhancementFit['annotationExp'], xy=(0.55, 0.5), xycoords='axes fraction', color='green')
+    ax6.annotate(enhancementFit['annotation'], xy=(
+        0.4, 0.5), xycoords='axes fraction', color='blue')
+    ax6.annotate(enhancementFit['annotationExp'], xy=(
+        0.55, 0.5), xycoords='axes fraction', color='green')
     ax6.set_title('Normalized DNP enhancement')
     ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-    ax6.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax6.legend(loc='upper right', fancybox=True,
+               shadow=True, fontsize='x-small')
     fig6.tight_layout()
     [fig6.savefig(os.path.join(path, evalPath, ('normalized_ODNP_enhancement.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(fig6)
-    print("Enhancement figure saved in {}".format(os.path.join(path, evalPath))) 
+    print("Enhancement figure saved in {}".format(os.path.join(path, evalPath)))
     if t1SeriesEval:
         # Main T1 figure
         figure = plt.figure(figsize=figSize)
@@ -1171,7 +1172,8 @@ def make_figures(results, path='', **kwargs):
         for i in range(0, len(t1Series[:, 0])):
             plt.annotate('exp {:d}'.format(int(t1Series[i, 0])),
                          xy=(t1Series[i, 1], t1Series[i, 3]),
-                         xytext=(t1Series[i, 1] + (max(t1Series[:, 1]) - min(t1Series[:, 1])) / 40, t1Series[i, 3]),
+                         xytext=(t1Series[i, 1] + (max(t1Series[:, 1]) -
+                                                   min(t1Series[:, 1])) / 40, t1Series[i, 3]),
                          va='center', ha='left', size=9, color='blue', alpha=0.6)
         plt.xlabel('Power (mW)')
         plt.ylabel('Time (s)')
@@ -1181,14 +1183,18 @@ def make_figures(results, path='', **kwargs):
         [plt.savefig(os.path.join(path, evalPath, ('T1_time_series.' + x)), dpi=plotDpi)
          for x in plotExts]
         plt.close(figure)
-        print("T1 figure saved in {}".format(os.path.join(path, evalPath))) 
+        print("T1 figure saved in {}".format(os.path.join(path, evalPath)))
         if kSigmaCalc:
             # kSigma figure
             figure = plt.figure(figsize=figSize)
-            plt.plot(dnpEnh[:, 1], kSigmaFit['kSigmaCor'], 'o', c='green', label='cor')
-            plt.plot(dnpEnh[:, 1], kSigmaFit['kSigmaUncor'], 'o', c='red', label='uncor')
-            plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataCor'], '--', c='green', label=kSigmaFit['corFormula'])
-            plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataUncor'], '--', c='red', label=kSigmaFit['uncorFormula'])
+            plt.plot(dnpEnh[:, 1], kSigmaFit['kSigmaCor'],
+                     'o', c='green', label='cor')
+            plt.plot(dnpEnh[:, 1], kSigmaFit['kSigmaUncor'],
+                     'o', c='red', label='uncor')
+            plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataCor'],
+                     '--', c='green', label=kSigmaFit['corFormula'])
+            plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataUncor'],
+                     '--', c='red', label=kSigmaFit['uncorFormula'])
             plt.xlabel('Power (mW)')
             plt.ylabel(r'$k_{\sigma}s(P)C$  $(\frac{1}{s})$')
             plt.title(r'$k_{\sigma}$ calculations')
@@ -1197,7 +1203,8 @@ def make_figures(results, path='', **kwargs):
             [plt.savefig(os.path.join(path, evalPath, ('kSigma.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
-            print("kSigma figure saved in {}".format(os.path.join(path, evalPath))) 
+            print("kSigma figure saved in {}".format(
+                os.path.join(path, evalPath)))
     for i, value in enumerate(results):
         if value.expType == 'dnp':  # FID plots
             print('Plotting exp {} figures (DNP)'.format(str(int(value.expNum))))
@@ -1206,11 +1213,13 @@ def make_figures(results, path='', **kwargs):
                 value.allFid[0][0]), label='real')
             plt.plot(value.fidTimeHistory['bLeftShift'], np.imag(
                 value.allFid[0][0]), label='imag')
-            plt.title('FID at {:+.1f} dBm and {:.2f} mW power'.format(value.powerDbm, value.powerMw))
+            plt.title(
+                'FID at {:+.1f} dBm and {:.2f} mW power'.format(value.powerDbm, value.powerMw))
             plt.xlabel('time (ms)')
             plt.ylabel('Signal (a.u.)')
             plt.tight_layout()
-            plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
@@ -1240,7 +1249,8 @@ def make_figures(results, path='', **kwargs):
             plt.tight_layout()
             plt.xlim(value.maxFreq - value.ftWindow,
                      value.maxFreq + value.ftWindow)
-            plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
@@ -1266,7 +1276,8 @@ def make_figures(results, path='', **kwargs):
                          yerr=(value.fitData[1] - value.t1fit['evalY']),
                          fmt='+',
                          label='data', capthick=2, capsize=2)
-            plt.plot(value.t1fit['xdata'], value.t1fit['ydata'], label=value.t1fit['t1FitFormula'])
+            plt.plot(value.t1fit['xdata'], value.t1fit['ydata'],
+                     label=value.t1fit['t1FitFormula'])
             plt.annotate(r'$T_1={{{:.4f}}}\pm{{{:.4f}}}$'.format(
                 value.t1fit['t1'], value.t1fit['t1error']), xy=(0.4, 0.5), xycoords='axes fraction')
             plt.title('$T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
@@ -1274,7 +1285,8 @@ def make_figures(results, path='', **kwargs):
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
-            plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
@@ -1289,7 +1301,8 @@ def make_figures(results, path='', **kwargs):
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
-            plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1_PC_real.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
@@ -1304,7 +1317,8 @@ def make_figures(results, path='', **kwargs):
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
-            plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1_PC_magn.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
@@ -1319,8 +1333,10 @@ def make_figures(results, path='', **kwargs):
             plt.xlabel('Frequency (Hz)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
-            plt.xlim(value.maxFreq - value.ftWindow, value.maxFreq + value.ftWindow)
-            plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+            plt.xlim(value.maxFreq - value.ftWindow,
+                     value.maxFreq + value.ftWindow)
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
@@ -1337,7 +1353,8 @@ def make_figures(results, path='', **kwargs):
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
             plt.xlim(0, max(value.fidTime) / 3.)
-            plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_corrected.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
@@ -1352,28 +1369,34 @@ def make_figures(results, path='', **kwargs):
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
-            plt.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_raw.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
     # DNP figures
     print("saving figures in {}".format(os.path.join(path, evalPath)))
     # saving figures in evaluation directory
-    ax0.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax0.legend(loc='upper right', fancybox=True,
+               shadow=True, fontsize='x-small')
     fig0.tight_layout()
-    [fig0.savefig(os.path.join(path, evalPath, ('01_FIDs_raw.' + x)), dpi=plotDpi) for x in plotExts]
+    [fig0.savefig(os.path.join(path, evalPath, ('01_FIDs_raw.' + x)),
+                  dpi=plotDpi) for x in plotExts]
     plt.close(fig0)
-    ax1.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax1.legend(loc='upper right', fancybox=True,
+               shadow=True, fontsize='x-small')
     fig1.tight_layout()
     [fig1.savefig(os.path.join(path, evalPath, ('02_FIDs_after_LS_RS_baseline.' + x)),
                   dpi=plotDpi) for x in plotExts]
     plt.close(fig1)
-    ax2.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax2.legend(loc='upper right', fancybox=True,
+               shadow=True, fontsize='x-small')
     fig2.tight_layout()
     [fig2.savefig(os.path.join(path, evalPath, ('03_FIDs_after_zero_filling.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(fig2)
-    ax3.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax3.legend(loc='upper right', fancybox=True,
+               shadow=True, fontsize='x-small')
     fig3.tight_layout()
     [fig3.savefig(os.path.join(path, evalPath, ('04_FIDs_after_exp_windowing.' + x)), dpi=plotDpi)
      for x in plotExts]
@@ -1396,11 +1419,13 @@ def make_figures(results, path='', **kwargs):
         zmin, zmax = min([min(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp']), max(
             [max(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp'])
         zs = [a.expNum for a in results if a.expType == 'dnp']
-        labels = ['{:d} ({:.2f} W)'.format(int(a.expNum), a.powerMw / 1000) for a in results if a.expType == 'dnp']
+        labels = ['{:d} ({:.2f} W)'.format(int(a.expNum), a.powerMw / 1000)
+                  for a in results if a.expType == 'dnp']
         plt.yticks(zs, labels,
                    rotation=270)
         for i, label in enumerate(ax13d.get_yticklabels()):
-            if label.get_text(): label.set_color(colors[i])
+            if label.get_text():
+                label.set_color(colors[i])
         ax13d.grid(True)
         ax13d.set_xlim3d(xmin, xmax)
         ax13d.set_zlim3d(zmin, zmax)
@@ -1428,7 +1453,8 @@ def make_figures(results, path='', **kwargs):
         poly.set_alpha(0.6)
         plt.yticks(zs, labels, rotation=270)
         for i, label in enumerate(ax43d.get_yticklabels()):
-            if label.get_text(): label.set_color(colors[i])
+            if label.get_text():
+                label.set_color(colors[i])
         ax43d.view_init(elev=17., azim=-23.)
         ax43d.grid(True)
         ax43d.set_xlim3d(xmin, xmax)
@@ -1437,7 +1463,8 @@ def make_figures(results, path='', **kwargs):
         ax43d.add_collection3d(poly, zs=zs, zdir='y')
         ax43d.view_init(elev=17., azim=-23.)
         ax43d.yaxis.labelpad = 45
-        ax43d.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+        ax43d.legend(loc='upper right', fancybox=True,
+                     shadow=True, fontsize='x-small')
         fig43d.tight_layout()
         [fig43d.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing_real_3d.' + x)), dpi=plotDpi)
          for x in plotExts]
@@ -1449,8 +1476,8 @@ def make_figures(results, path='', **kwargs):
         ax73d.set_zlabel('Intensity (a.u.)')
         ax73d.set_ylabel('Experiment index')
         verts = [list(zip(a.frequency[np.logical_and(a.frequency > xmin, a.frequency < xmax)], (
-                np.abs(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]) * a.real[1][0] / np.abs(
-            a.real[1][0])))) for a in results if a.expType == 'dnp']
+            np.abs(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]) * a.real[1][0] / np.abs(
+                a.real[1][0])))) for a in results if a.expType == 'dnp']
         zmin, zmax = min(
             [min(np.abs(a.allFid[5][0]) * a.real[1][0] / np.abs(a.real[1][0])) for a in results if
              a.expType == 'dnp']), max(
@@ -1460,7 +1487,8 @@ def make_figures(results, path='', **kwargs):
         poly.set_alpha(0.6)
         plt.yticks(zs, labels, rotation=270)
         for i, label in enumerate(ax73d.get_yticklabels()):
-            if label.get_text(): label.set_color(colors[i])
+            if label.get_text():
+                label.set_color(colors[i])
         ax73d.grid(True)
         ax73d.set_xlim3d(xmin, xmax)
         ax73d.set_zlim3d(zmin, zmax)
@@ -1468,24 +1496,26 @@ def make_figures(results, path='', **kwargs):
         ax73d.add_collection3d(poly, zs=zs, zdir='y')
         ax73d.view_init(elev=17., azim=-23.)
         ax73d.yaxis.labelpad = 45
-        ax73d.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+        ax73d.legend(loc='upper right', fancybox=True,
+                     shadow=True, fontsize='x-small')
         # fig73d.colorbar(test)
         fig73d.tight_layout()
         [fig73d.savefig(os.path.join(path, evalPath, ('06_FT_after_phasing_magn_3d.' + x)), dpi=plotDpi)
          for x in plotExts]
         plt.close(fig73d)
-    ax4.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax4.legend(loc='upper right', fancybox=True,
+               shadow=True, fontsize='x-small')
     fig4.tight_layout()
     [fig4.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing_real.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(fig4)
-    ax7.legend(loc='upper right', fancybox=True, shadow=True, fontsize='x-small')
+    ax7.legend(loc='upper right', fancybox=True,
+               shadow=True, fontsize='x-small')
     fig7.tight_layout()
     [fig7.savefig(os.path.join(path, evalPath, ('06_FT_after_phasing_magn.' + x)), dpi=plotDpi)
      for x in plotExts]
     plt.close(fig7)
     plt.close(fig5)
-    
 
 
 def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitting
@@ -1499,7 +1529,8 @@ def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitt
     # res = least_squares(fun, x0 = popt, args = (time, intensity)) # Do least squares minimization
     xdata = np.linspace(min(time), max(time), spaceNo)
     ydata = t1ir(xdata, *popt)
-    rmsd = np.sqrt(((np.array(intensity) - np.array(t1ir(time, *popt))) ** 2).mean())
+    rmsd = np.sqrt(
+        ((np.array(intensity) - np.array(t1ir(time, *popt))) ** 2).mean())
     return {
         'xdata': xdata,
         'ydata': ydata,
@@ -1519,8 +1550,10 @@ def fit_enhancement(power, enhancement):
         return a * np.exp(-b * x) + d
 
     poptExp, pcovExp = curve_fit(func_exp, power, enhancement, maxfev=50000)
-    popt, pcov = curve_fit(func, power, enhancement, maxfev=50000, p0=(poptExp[0], poptExp[1], 1, poptExp[2]))
-    print("Enhancement fit values are {} for normal and {} for exponential fit".format(popt, poptExp))
+    popt, pcov = curve_fit(func, power, enhancement, maxfev=50000, p0=(
+        poptExp[0], poptExp[1], 1, poptExp[2]))
+    print("Enhancement fit values are {} for normal and {} for exponential fit".format(
+        popt, poptExp))
     eMax = func(np.inf, *popt)
     eP = 1 - (1 - eMax) / 2
     sd = 0  # square deviation
@@ -1538,7 +1571,8 @@ def fit_enhancement(power, enhancement):
     eHalf = min(abs(ydata - eP))
     eHalfExp = min(abs(ydataExp - ePExp))
     pHalf = np.asarray(list(zip(xdata, ydata)))[abs(ydata - eP) == eHalf][0][0]
-    pHalfExp = np.asarray(list(zip(xdata, ydataExp)))[abs(ydataExp - ePExp) == eHalfExp][0][0]
+    pHalfExp = np.asarray(list(zip(xdata, ydataExp)))[
+        abs(ydataExp - ePExp) == eHalfExp][0][0]
     return {
         'rmsd': rmsd,
         'xdata': xdata,
@@ -1548,10 +1582,11 @@ def fit_enhancement(power, enhancement):
         'eMax': eMax,
         'eP': eP,
         'enhancementFormula': r"$E(P) = {:5.2f}exp({:+5.3f} P^{{{:5.2f}}}) {:+5.2f}$, RMSD = {:5.2f}".
-            format(*popt, rmsd),
+        format(*popt, rmsd),
         'annotation': r"$S_{{rel}}(P) = \frac{{P / {:5.2f} }}{{1+P / {:5.2f} }}$"
                       "\n"
-                      r"$E_{{max}} = {:5.2f}$".format(pHalf, pHalf, func(np.inf, *popt)),
+                      r"$E_{{max}} = {:5.2f}$".format(
+                          pHalf, pHalf, func(np.inf, *popt)),
         'rmsdExp': rmsdExp,
         'ydataExp': ydataExp,
         'eHalfExp': eHalfExp,
@@ -1559,16 +1594,19 @@ def fit_enhancement(power, enhancement):
         'eMaxExp': eMaxExp,
         'ePExp': ePExp,
         'enhancementFormulaExp': r"$E(P) = {:5.2f}exp({:+5.3f} P) {:+5.2f}$, RMSD = {:5.2f}".
-            format(*poptExp, rmsd),
+        format(*poptExp, rmsd),
         'annotationExp': r"$S_{{rel}}(P) = \frac{{P / {:5.2f} }}{{1+P / {:5.2f} }}$"
                          "\n"
-                         r"$E_{{max}} = {:5.2f}$".format(pHalfExp, pHalfExp, func_exp(np.inf, *poptExp)),
+                         r"$E_{{max}} = {:5.2f}$".format(
+                             pHalfExp, pHalfExp, func_exp(np.inf, *poptExp)),
     }
 
 
 def k_sigma_calc(power, enhancement, t1SeriesFunc, t1SeriesFit, spaceNo=500):
-    kSigmaUncor = [((1 - enhancement[i]) * .00152 / t1SeriesFunc(power[0])) for i in range(len(power))]
-    kSigmaCor = [((1 - enhancement[i]) * .00152 / t1SeriesFunc(power[i])) for i in range(len(power))]
+    kSigmaUncor = [((1 - enhancement[i]) * .00152 / t1SeriesFunc(power[0]))
+                   for i in range(len(power))]
+    kSigmaCor = [((1 - enhancement[i]) * .00152 / t1SeriesFunc(power[i]))
+                 for i in range(len(power))]
 
     def func(x, a, b):
         return a * x / (b + x)
@@ -1590,15 +1628,18 @@ def k_sigma_calc(power, enhancement, t1SeriesFunc, t1SeriesFit, spaceNo=500):
         'kSigmaSmaxUncor': kSigmaSmaxUncor,
         'corFormula': r'$k_{{\sigma}}s(P)C = \frac{{{:.2e}\times P}}{{{:.2f}+P}}$'
                       '\n'
-                      r'$k_{{\sigma}}s_{{max}}C = {:,.2e}$ $(\frac{{1}}{{s}})$'.format(*poptCor, kSigmaSmaxCor),
+                      r'$k_{{\sigma}}s_{{max}}C = {:,.2e}$ $(\frac{{1}}{{s}})$'.format(
+                          *poptCor, kSigmaSmaxCor),
         'uncorFormula': r'$k_{{\sigma}}s(P)C = \frac{{{:.2e}\times P}}{{{:.2f}+P}}$'
                         '\n'
-                        r'$k_{{\sigma}}s_{{max}}C = {:,.2e}$ $(\frac{{1}}{{s}})$'.format(*poptUncor, kSigmaSmaxUncor),
+                        r'$k_{{\sigma}}s_{{max}}C = {:,.2e}$ $(\frac{{1}}{{s}})$'.format(
+                            *poptUncor, kSigmaSmaxUncor),
     }
 
 
 def fit_t1_series(power, t1, t1error=0, degree=1, spaceNo=500):
-    coefs = np.polyfit(np.asarray(power), np.asarray(t1), degree, w=1 / np.asarray(t1error))
+    coefs = np.polyfit(np.asarray(power), np.asarray(t1),
+                       degree, w=1 / np.asarray(t1error))
     fit = np.poly1d(coefs)
     xdata = np.linspace(min(power), max(power), spaceNo)
     ydata = fit(xdata)
@@ -1628,3 +1669,47 @@ def cc(arg):
 def find_nearest(array, values):
     indices = np.abs(np.subtract.outer(array, values)).argmin(0)
     return indices, array[indices]
+
+
+def calculate_dnp_enh(results):
+    powerMw = -1
+    dnpEnh = []  # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
+    dnpCounter = 0
+    enhMinPower = [results[i] for i in range(len(results)) if results[i].magn[1][0] == min(
+        [result.magn[1][0] for result in results if result.expType == 'dnp'])][0].powerMw
+    for i, result in enumerate(results):
+        if result.expType == 'dnp':
+            if dnpCounter == 0:
+                normReal = result.real[1][0]
+                normMagn = result.magn[1][0]
+            if result.powerMw > enhMinPower:
+                dnpEnhLine = [result.expNum, result.powerMw, result.powerDbm, -result.real[1][0],
+                              -result.real[1][0] / normReal, -result.magn[1][0], -result.magn[1][0] / normMagn]
+            else:
+                dnpEnhLine = [result.expNum, result.powerMw, result.powerDbm, result.real[1][0],
+                              result.real[1][0] / normReal, result.magn[1][0], result.magn[1][0] / normMagn]
+            
+            if result.powerMw >= powerMw:
+                # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
+                dnpEnhLine.append(1)
+            else:
+                dnpEnhLine.append(0)
+            dnpEnh.append(dnpEnhLine)
+            dnpCounter += 1
+            powerMw = result.powerMw
+    return dnpEnh
+
+
+def calculate_t1_series(results):
+    t1Series = []
+    t1Counter = 0
+    for i, result in enumerate(results):
+        if result.expType == 't1':
+            # expNum, powerMw, powerDbm, t1, t1error
+            t1Series.append([result.expNum,
+                             result.powerMw,
+                             result.powerDbm,
+                             result.t1fit['t1'],
+                             result.t1fit['t1error']])
+            t1Counter += 1
+    return t1Series
