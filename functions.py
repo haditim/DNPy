@@ -59,6 +59,7 @@ class NMRData(object):
         self.ftWindow = kwargs.get('ftWindow', 200)
         self.maxWin = kwargs.get('maxWin', 1000)
         self.t1Calc = kwargs.get('t1Calc', 'PCmagn')
+        self.t1ErrorTol = kwargs.get('t1ErrorTol', 0.5)
         if datatype == '':
             print("No Datatype - Setting it to ntnmr")
             datatype = "ntnmr"
@@ -779,7 +780,7 @@ class NMRData(object):
             elif self.t1Calc == 'PCmagn':
                 # set to whatever you want to be fitted and plotted and source of T1
                 self.fitData = [self.phC[0], self.phC[2]]
-            self.t1fit = fit_t1(self.fitData[0], self.fitData[1])
+            self.t1fit = fit_t1(self.fitData[0], self.fitData[1], t1ErrorTol=self.t1ErrorTol)
 
 
 def fwhm(x, y):
@@ -1358,6 +1359,25 @@ def make_figures(results, path='', **kwargs):
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_corrected.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
+            # After exponential windowing
+            figure = plt.figure(figsize=figSize)
+            for j, time in enumerate(value.allFid[5]):
+                if j % (value.phaseCycles) == 0:  # only first scan
+                    plt.plot(value.fidTime, np.real(value.allFid[3][j]),
+                             label='{:.2f}s'.format(value.vdList[int(j / value.phaseCycles)]))
+            plt.title('$T_1$ FIDs at {:.2f} mW power, {}$^\circ$ phase'.format(
+                value.powerMw, value.ph))
+            plt.xlabel('Time (s)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.xlim(0, max(value.fidTime))
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_after_windowing.' + x)), dpi=plotDpi)
+             for x in plotExts]
+            plt.close(figure)
+
+
             figure = plt.figure(figsize=figSize)
             # after corrections
             for j, time in enumerate(value.allFid[5]):
@@ -1518,7 +1538,7 @@ def make_figures(results, path='', **kwargs):
     plt.close(fig5)
 
 
-def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitting
+def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500, t1ErrorTol=0.5):  # T1 fitting
     def t1ir(x, si0, c, t1):  # Defines the T1 function.
         return si0 + (-c - si0) * np.exp(-x / t1)
 
@@ -1531,6 +1551,8 @@ def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500):  # T1 fitt
     ydata = t1ir(xdata, *popt)
     rmsd = np.sqrt(
         ((np.array(intensity) - np.array(t1ir(time, *popt))) ** 2).mean())
+    if np.sqrt(pcov[2, 2])>t1ErrorTol:
+        raise Exception('T1 error should not exceed t1ErrorTol value. T1 error is {:0.3} and t1ErrorTol {:0.3}'.format(np.sqrt(pcov[2, 2]), t1ErrorTol))
     return {
         'xdata': xdata,
         'ydata': ydata,
