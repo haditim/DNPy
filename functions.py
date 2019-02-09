@@ -780,7 +780,8 @@ class NMRData(object):
             elif self.t1Calc == 'PCmagn':
                 # set to whatever you want to be fitted and plotted and source of T1
                 self.fitData = [self.phC[0], self.phC[2]]
-            self.t1fit = fit_t1(self.fitData[0], self.fitData[1], t1ErrorTol=self.t1ErrorTol)
+            self.t1fit = fit_t1(
+                self.fitData[0], self.fitData[1], t1ErrorTol=self.t1ErrorTol)
 
 
 def fwhm(x, y):
@@ -834,6 +835,7 @@ def return_exps(path, **kwargs):
     process = kwargs.get('process', True)
     t1SeriesEval = kwargs.get('t1SeriesEval', True)
     kSigmaCalc = kwargs.get('kSigmaCalc', True)
+    enhCalc = kwargs.get('enhCalc', True)
     dumpToCsv = kwargs.get('dumpToCsv', True)
     filesInDir = os.listdir(path)
     dirs = []
@@ -997,13 +999,19 @@ def return_exps(path, **kwargs):
         results.append(result)
 
     if process:
-        dnpEnh = calculate_dnp_enh(results)
+        if enhCalc and len([res for res in results if res.expType == 'dnp']) > 0:
+            dnpEnh = calculate_dnp_enh(results)
+            enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
+            dnpEnh = np.asarray(dnpEnh)
+            print(r"Fitting enhancement")
+            kwargs['dnpEnh'] = dnpEnh
+            kwargs['enhancementFit'] = enhancementFit
+        else:
+            kSigmaCalc = False
+            kwargs['kSigmaCalc'] = False
+            kwargs['enhCalc'] = False
+            print('No DNP exps. found, no enhancement/kSigma curve will be created.')
         t1Series = calculate_t1_series(results)
-        print(r"Fitting enhancement")
-        dnpEnh = np.asarray(dnpEnh)
-        enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
-        kwargs['dnpEnh'] = dnpEnh
-        kwargs['enhancementFit'] = enhancementFit
         if t1SeriesEval or kSigmaCalc:
             if not t1Series:
                 print(
@@ -1076,6 +1084,7 @@ def make_figures(results, path='', **kwargs):
     plotExts = kwargs.get('plotExts', ['jpg'])
     t1SeriesEval = kwargs.get('t1SeriesEval', True)
     kSigmaCalc = kwargs.get('kSigmaCalc', True)
+    enhCalc = kwargs.get('enhCalc', True)
     # Initializing figures
     fig0 = plt.figure(figsize=figSize)
     ax0 = fig0.add_subplot(111)
@@ -1118,50 +1127,50 @@ def make_figures(results, path='', **kwargs):
     ax6 = fig6.add_subplot(111)
     ax6.set_xlabel('Power (mW)')
     ax6.set_ylabel('FT Integral, normalized to MW off')
-
-    # Generating figures for dnp folders and collection of data
-    powers = [x.powerMw for x in results if x.expType == 'dnp']
-    inter = interp1d([min(powers), max(powers)], [0, 1])
-    colors = [cm.jet(inter(x)) for x in powers]
-    # DNP enhancement
-    ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                     == 1][:, 6], 'bo', marker="o", label='forward magn.')
-    ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                     == 0][:, 6], 'ro', marker="o", label='backward magn')
-    ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                     == 1][:, 4], 'bo', marker="x", label='forward real')
-    ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                     == 0][:, 4], 'ro', marker="x", label='backward real')
-    for i in range(0, len(dnpEnh[:, 0])):
-        if dnpEnh[i, 7] == 1:
-            ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
-                         xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                         xytext=(dnpEnh[i, 1] + (max(dnpEnh[:, 1]) -
-                                                 min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
-                         va='center', ha='left', size=9, color='blue', alpha=0.6)
-        elif dnpEnh[i, 7] == 0:
-            ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
-                         xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                         xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) -
-                                                 min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
-                         va='center', ha='right', size=9, color='red', alpha=0.6)
-    ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--',
-             label='(magn.) ' + enhancementFit['enhancementFormula'])
-    ax6.plot(enhancementFit['xdata'], enhancementFit['ydataExp'], 'g--',
-             label='(magn.) ' + enhancementFit['enhancementFormulaExp'])
-    ax6.annotate(enhancementFit['annotation'], xy=(
-        0.4, 0.5), xycoords='axes fraction', color='blue')
-    ax6.annotate(enhancementFit['annotationExp'], xy=(
-        0.55, 0.5), xycoords='axes fraction', color='green')
-    ax6.set_title('Normalized DNP enhancement')
-    ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-    ax6.legend(loc='upper right', fancybox=True,
-               shadow=True, fontsize='x-small')
-    fig6.tight_layout()
-    [fig6.savefig(os.path.join(path, evalPath, ('normalized_ODNP_enhancement.' + x)), dpi=plotDpi)
-     for x in plotExts]
-    plt.close(fig6)
-    print("Enhancement figure saved in {}".format(os.path.join(path, evalPath)))
+    if enhCalc:
+        # Generating figures for dnp folders and collection of data
+        powers = [x.powerMw for x in results if x.expType == 'dnp']
+        inter = interp1d([min(powers), max(powers)], [0, 1])
+        colors = [cm.jet(inter(x)) for x in powers]
+        # DNP enhancement
+        ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
+                                                        == 1][:, 6], 'bo', marker="o", label='forward magn.')
+        ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
+                                                        == 0][:, 6], 'ro', marker="o", label='backward magn')
+        ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
+                                                        == 1][:, 4], 'bo', marker="x", label='forward real')
+        ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
+                                                        == 0][:, 4], 'ro', marker="x", label='backward real')
+        for i in range(0, len(dnpEnh[:, 0])):
+            if dnpEnh[i, 7] == 1:
+                ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
+                            xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
+                            xytext=(dnpEnh[i, 1] + (max(dnpEnh[:, 1]) -
+                                                    min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
+                            va='center', ha='left', size=9, color='blue', alpha=0.6)
+            elif dnpEnh[i, 7] == 0:
+                ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
+                            xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
+                            xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) -
+                                                    min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
+                            va='center', ha='right', size=9, color='red', alpha=0.6)
+        ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--',
+                label='(magn.) ' + enhancementFit['enhancementFormula'])
+        ax6.plot(enhancementFit['xdata'], enhancementFit['ydataExp'], 'g--',
+                label='(magn.) ' + enhancementFit['enhancementFormulaExp'])
+        ax6.annotate(enhancementFit['annotation'], xy=(
+            0.4, 0.5), xycoords='axes fraction', color='blue')
+        ax6.annotate(enhancementFit['annotationExp'], xy=(
+            0.55, 0.5), xycoords='axes fraction', color='green')
+        ax6.set_title('Normalized DNP enhancement')
+        ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+        ax6.legend(loc='upper right', fancybox=True,
+                shadow=True, fontsize='x-small')
+        fig6.tight_layout()
+        [fig6.savefig(os.path.join(path, evalPath, ('normalized_ODNP_enhancement.' + x)), dpi=plotDpi)
+        for x in plotExts]
+        plt.close(fig6)
+        print("Enhancement figure saved in {}".format(os.path.join(path, evalPath)))
     if t1SeriesEval:
         # Main T1 figure
         figure = plt.figure(figsize=figSize)
@@ -1377,7 +1386,6 @@ def make_figures(results, path='', **kwargs):
              for x in plotExts]
             plt.close(figure)
 
-
             figure = plt.figure(figsize=figSize)
             # after corrections
             for j, time in enumerate(value.allFid[5]):
@@ -1422,107 +1430,110 @@ def make_figures(results, path='', **kwargs):
      for x in plotExts]
     plt.close(fig3)
     if make3dPlots:
-        # 3D FT plot
-        print("Plotting 3D views")
-        fig13d = plt.figure(figsize=figSize)
-        ax13d = fig13d.gca(projection='3d')
-        ax13d.set_title('NMR FIDs after baseline/offset correction (magn.)')
-        ax13d.set_xlabel('time (ms)')
-        ax13d.set_zlabel('Signal (a.u.)')
-        ax13d.set_ylabel('Experiment index')
-        # 3D plots for FIDs
-        [ax13d.plot3D(value.fidTimeHistory['bZeroFilling'], np.abs(value.allFid[1][0]), value.expNum, zdir='y',
-                      zorder=int(-value.expNum), color=colors[i]) for i, value in
-         enumerate(x for x in results if x.expType == 'dnp')]
-        xmin, xmax = min([min(a.fidTimeHistory['bZeroFilling']) for a in results if a.expType == 'dnp']), max(
-            [max(a.fidTimeHistory['bZeroFilling']) for a in results if a.expType == 'dnp'])
-        zmin, zmax = min([min(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp']), max(
-            [max(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp'])
-        zs = [a.expNum for a in results if a.expType == 'dnp']
-        labels = ['{:d} ({:.2f} W)'.format(int(a.expNum), a.powerMw / 1000)
-                  for a in results if a.expType == 'dnp']
-        plt.yticks(zs, labels,
-                   rotation=270)
-        for i, label in enumerate(ax13d.get_yticklabels()):
-            if label.get_text():
-                label.set_color(colors[i])
-        ax13d.grid(True)
-        ax13d.set_xlim3d(xmin, xmax)
-        ax13d.set_zlim3d(zmin, zmax)
-        ax13d.set_ylim3d(min(zs), max(zs))
-        ax13d.yaxis.labelpad = 45
-        ax13d.view_init(elev=17., azim=-23.)
-        fig13d.tight_layout()
-        [fig13d.savefig(os.path.join(path, evalPath, ('01_FIDs_raw_3D.' + x)), dpi=plotDpi)
-         for x in plotExts]
-        plt.close(fig13d)
-        fig43d = plt.figure(figsize=figSize)
-        ax43d = fig43d.gca(projection='3d')
-        ax43d.set_title('NMR FTs after exponential windowing (real)')
-        ax43d.set_xlabel('Frequency offset (Hz)')
-        ax43d.set_zlabel('Intensity (a.u.)')
-        ax43d.set_ylabel('Experiment index')
-        xmin, xmax = min([a.maxFreq - a.ftWindow for a in results if a.expType == 'dnp']), max(
-            [a.maxFreq + a.ftWindow for a in results if a.expType == 'dnp'])
-        zmin, zmax = min([min(np.real(a.allFid[5][0])) for a in results if a.expType == 'dnp']), max(
-            [max(np.real(a.allFid[5][0])) for a in results if a.expType == 'dnp'])
-        verts = [list(zip(a.frequency[np.logical_and(a.frequency > xmin, a.frequency < xmax)],
-                          np.real(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]))) for a in
-                 results if a.expType == 'dnp']
-        poly = PolyCollection(verts, facecolors=colors)
-        poly.set_alpha(0.6)
-        plt.yticks(zs, labels, rotation=270)
-        for i, label in enumerate(ax43d.get_yticklabels()):
-            if label.get_text():
-                label.set_color(colors[i])
-        ax43d.view_init(elev=17., azim=-23.)
-        ax43d.grid(True)
-        ax43d.set_xlim3d(xmin, xmax)
-        ax43d.set_zlim3d(zmin, zmax)
-        ax43d.set_ylim3d(min(zs), max(zs))
-        ax43d.add_collection3d(poly, zs=zs, zdir='y')
-        ax43d.view_init(elev=17., azim=-23.)
-        ax43d.yaxis.labelpad = 45
-        ax43d.legend(loc='upper right', fancybox=True,
-                     shadow=True, fontsize='x-small')
-        fig43d.tight_layout()
-        [fig43d.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing_real_3d.' + x)), dpi=plotDpi)
-         for x in plotExts]
-        plt.close(fig43d)
-        fig73d = plt.figure(figsize=figSize)
-        ax73d = fig73d.gca(projection='3d')
-        ax73d.set_title('NMR FTs after exponential windowing (magnitude)')
-        ax73d.set_xlabel('Frequency offset (Hz)')
-        ax73d.set_zlabel('Intensity (a.u.)')
-        ax73d.set_ylabel('Experiment index')
-        verts = [list(zip(a.frequency[np.logical_and(a.frequency > xmin, a.frequency < xmax)], (
-            np.abs(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]) * a.real[1][0] / np.abs(
-                a.real[1][0])))) for a in results if a.expType == 'dnp']
-        zmin, zmax = min(
-            [min(np.abs(a.allFid[5][0]) * a.real[1][0] / np.abs(a.real[1][0])) for a in results if
-             a.expType == 'dnp']), max(
-            [max(np.abs(a.allFid[5][0]) * a.real[1][0] / np.abs(a.real[1][0])) for a in results if a.expType == 'dnp'])
-        zs = [a.expNum for a in results if a.expType == 'dnp']
-        poly = PolyCollection(verts, facecolors=colors)
-        poly.set_alpha(0.6)
-        plt.yticks(zs, labels, rotation=270)
-        for i, label in enumerate(ax73d.get_yticklabels()):
-            if label.get_text():
-                label.set_color(colors[i])
-        ax73d.grid(True)
-        ax73d.set_xlim3d(xmin, xmax)
-        ax73d.set_zlim3d(zmin, zmax)
-        ax73d.set_ylim3d(min(zs), max(zs))
-        ax73d.add_collection3d(poly, zs=zs, zdir='y')
-        ax73d.view_init(elev=17., azim=-23.)
-        ax73d.yaxis.labelpad = 45
-        ax73d.legend(loc='upper right', fancybox=True,
-                     shadow=True, fontsize='x-small')
-        # fig73d.colorbar(test)
-        fig73d.tight_layout()
-        [fig73d.savefig(os.path.join(path, evalPath, ('06_FT_after_phasing_magn_3d.' + x)), dpi=plotDpi)
-         for x in plotExts]
-        plt.close(fig73d)
+        try:
+            # 3D FT plot
+            print("Plotting 3D views")
+            fig13d = plt.figure(figsize=figSize)
+            ax13d = fig13d.gca(projection='3d')
+            ax13d.set_title('NMR FIDs after baseline/offset correction (magn.)')
+            ax13d.set_xlabel('time (ms)')
+            ax13d.set_zlabel('Signal (a.u.)')
+            ax13d.set_ylabel('Experiment index')
+            # 3D plots for FIDs
+            [ax13d.plot3D(value.fidTimeHistory['bZeroFilling'], np.abs(value.allFid[1][0]), value.expNum, zdir='y',
+                        zorder=int(-value.expNum), color=colors[i]) for i, value in
+            enumerate(x for x in results if x.expType == 'dnp')]
+            xmin, xmax = min([min(a.fidTimeHistory['bZeroFilling']) for a in results if a.expType == 'dnp']), max(
+                [max(a.fidTimeHistory['bZeroFilling']) for a in results if a.expType == 'dnp'])
+            zmin, zmax = min([min(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp']), max(
+                [max(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp'])
+            zs = [a.expNum for a in results if a.expType == 'dnp']
+            labels = ['{:d} ({:.2f} W)'.format(int(a.expNum), a.powerMw / 1000)
+                    for a in results if a.expType == 'dnp']
+            plt.yticks(zs, labels,
+                    rotation=270)
+            for i, label in enumerate(ax13d.get_yticklabels()):
+                if label.get_text():
+                    label.set_color(colors[i])
+            ax13d.grid(True)
+            ax13d.set_xlim3d(xmin, xmax)
+            ax13d.set_zlim3d(zmin, zmax)
+            ax13d.set_ylim3d(min(zs), max(zs))
+            ax13d.yaxis.labelpad = 45
+            ax13d.view_init(elev=17., azim=-23.)
+            fig13d.tight_layout()
+            [fig13d.savefig(os.path.join(path, evalPath, ('01_FIDs_raw_3D.' + x)), dpi=plotDpi)
+            for x in plotExts]
+            plt.close(fig13d)
+            fig43d = plt.figure(figsize=figSize)
+            ax43d = fig43d.gca(projection='3d')
+            ax43d.set_title('NMR FTs after exponential windowing (real)')
+            ax43d.set_xlabel('Frequency offset (Hz)')
+            ax43d.set_zlabel('Intensity (a.u.)')
+            ax43d.set_ylabel('Experiment index')
+            xmin, xmax = min([a.maxFreq - a.ftWindow for a in results if a.expType == 'dnp']), max(
+                [a.maxFreq + a.ftWindow for a in results if a.expType == 'dnp'])
+            zmin, zmax = min([min(np.real(a.allFid[5][0])) for a in results if a.expType == 'dnp']), max(
+                [max(np.real(a.allFid[5][0])) for a in results if a.expType == 'dnp'])
+            verts = [list(zip(a.frequency[np.logical_and(a.frequency > xmin, a.frequency < xmax)],
+                            np.real(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]))) for a in
+                    results if a.expType == 'dnp']
+            poly = PolyCollection(verts, facecolors=colors)
+            poly.set_alpha(0.6)
+            plt.yticks(zs, labels, rotation=270)
+            for i, label in enumerate(ax43d.get_yticklabels()):
+                if label.get_text():
+                    label.set_color(colors[i])
+            ax43d.view_init(elev=17., azim=-23.)
+            ax43d.grid(True)
+            ax43d.set_xlim3d(xmin, xmax)
+            ax43d.set_zlim3d(zmin, zmax)
+            ax43d.set_ylim3d(min(zs), max(zs))
+            ax43d.add_collection3d(poly, zs=zs, zdir='y')
+            ax43d.view_init(elev=17., azim=-23.)
+            ax43d.yaxis.labelpad = 45
+            ax43d.legend(loc='upper right', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            fig43d.tight_layout()
+            [fig43d.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing_real_3d.' + x)), dpi=plotDpi)
+            for x in plotExts]
+            plt.close(fig43d)
+            fig73d = plt.figure(figsize=figSize)
+            ax73d = fig73d.gca(projection='3d')
+            ax73d.set_title('NMR FTs after exponential windowing (magnitude)')
+            ax73d.set_xlabel('Frequency offset (Hz)')
+            ax73d.set_zlabel('Intensity (a.u.)')
+            ax73d.set_ylabel('Experiment index')
+            verts = [list(zip(a.frequency[np.logical_and(a.frequency > xmin, a.frequency < xmax)], (
+                np.abs(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]) * a.real[1][0] / np.abs(
+                    a.real[1][0])))) for a in results if a.expType == 'dnp']
+            zmin, zmax = min(
+                [min(np.abs(a.allFid[5][0]) * a.real[1][0] / np.abs(a.real[1][0])) for a in results if
+                a.expType == 'dnp']), max(
+                [max(np.abs(a.allFid[5][0]) * a.real[1][0] / np.abs(a.real[1][0])) for a in results if a.expType == 'dnp'])
+            zs = [a.expNum for a in results if a.expType == 'dnp']
+            poly = PolyCollection(verts, facecolors=colors)
+            poly.set_alpha(0.6)
+            plt.yticks(zs, labels, rotation=270)
+            for i, label in enumerate(ax73d.get_yticklabels()):
+                if label.get_text():
+                    label.set_color(colors[i])
+            ax73d.grid(True)
+            ax73d.set_xlim3d(xmin, xmax)
+            ax73d.set_zlim3d(zmin, zmax)
+            ax73d.set_ylim3d(min(zs), max(zs))
+            ax73d.add_collection3d(poly, zs=zs, zdir='y')
+            ax73d.view_init(elev=17., azim=-23.)
+            ax73d.yaxis.labelpad = 45
+            ax73d.legend(loc='upper right', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            # fig73d.colorbar(test)
+            fig73d.tight_layout()
+            [fig73d.savefig(os.path.join(path, evalPath, ('06_FT_after_phasing_magn_3d.' + x)), dpi=plotDpi)
+            for x in plotExts]
+            plt.close(fig73d)
+        except Exception as e:
+            print('Error "{}" occured while making 3D plots'.format(e))
     ax4.legend(loc='upper right', fancybox=True,
                shadow=True, fontsize='x-small')
     fig4.tight_layout()
@@ -1551,8 +1562,9 @@ def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500, t1ErrorTol=
     ydata = t1ir(xdata, *popt)
     rmsd = np.sqrt(
         ((np.array(intensity) - np.array(t1ir(time, *popt))) ** 2).mean())
-    if np.sqrt(pcov[2, 2])>t1ErrorTol:
-        raise Exception('T1 error should not exceed t1ErrorTol value. T1 error is {:0.3} and t1ErrorTol {:0.3}'.format(np.sqrt(pcov[2, 2]), t1ErrorTol))
+    if np.sqrt(pcov[2, 2]) > t1ErrorTol:
+        raise Exception('T1 error should not exceed t1ErrorTol value. T1 error is {:0.3} and t1ErrorTol {:0.3}'.format(
+            np.sqrt(pcov[2, 2]), t1ErrorTol))
     return {
         'xdata': xdata,
         'ydata': ydata,
@@ -1697,7 +1709,7 @@ def calculate_dnp_enh(results):
     powerMw = -1
     dnpEnh = []  # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
     dnpCounter = 0
-    enhMinPower = [results[i] for i in range(len(results)) if results[i].magn[1][0] == min(
+    [results[i] for i in range(len(results)) if results[i].magn[1][0] == min(
         [result.magn[1][0] for result in results if result.expType == 'dnp'])][0].powerMw
     for i, result in enumerate(results):
         if result.expType == 'dnp':
@@ -1710,7 +1722,7 @@ def calculate_dnp_enh(results):
             else:
                 dnpEnhLine = [result.expNum, result.powerMw, result.powerDbm, result.real[1][0],
                               result.real[1][0] / normReal, result.magn[1][0], result.magn[1][0] / normMagn]
-            
+
             if result.powerMw >= powerMw:
                 # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
                 dnpEnhLine.append(1)

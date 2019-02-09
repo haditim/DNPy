@@ -6,11 +6,10 @@ from functions import NMRData
 foldersInDir = []
 
 # For evaluating several folders at once
-path = ''
+path = '/path/to/exp/folder'
+# Comment the nex line if you only want to evaluate one set of data. This is for evaluating several folders at the same time
 foldersInDir = [os.path.join(path,d) for d in os.listdir(path) if os.path.isdir(os.path.join(path,d))]
 
-# For a single folder
-# path = '/mnt/newEPR/HADI/Data/ODNP/TM200/201901'
 powerFile = ''
 kwargs = {
     't1Calc': 'PCreal',  # 'PCreal' for real phase cycled channel or 'PCmagn' or 'real' or 'magn'
@@ -37,6 +36,7 @@ kwargs = {
     't1SeriesPolDeg': 1,  # Polynomial degree for T1 series fit (default = 1)
     't1ErrorTol': 1, # The tolerance for T1 experiment error, this is to prevent bad T1 series fits
     'kSigmaCalc': True,
+    'enhCalc': True,
     }
 
 if __name__ == '__main__':
