@@ -1,14 +1,14 @@
 from typing import List
 import os
-from functions import *
+from functions import return_exps
 from functions import NMRData
 
 foldersInDir = []
 
 # For evaluating several folders at once
-path = '/path/to/exp/folder'
+path = '/run/media/hadi/0ea14823-f28b-4ca3-ab38-748260d2f31e/Work/RUB/HADI/Data/ODNP/Tests/20190209_PhaseCyclingTest'
 # Comment the nex line if you only want to evaluate one set of data. This is for evaluating several folders at the same time
-foldersInDir = [os.path.join(path,d) for d in os.listdir(path) if os.path.isdir(os.path.join(path,d))]
+# foldersInDir = [os.path.join(path,d) for d in os.listdir(path) if os.path.isdir(os.path.join(path,d))]
 
 powerFile = ''
 kwargs = {
