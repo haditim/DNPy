@@ -1000,9 +1000,12 @@ def return_exps(path, **kwargs):
 
     if process:
         if enhCalc and len([res for res in results if res.expType == 'dnp']) > 0:
-            dnpEnh = calculate_dnp_enh(results)
-            enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
-            dnpEnh = np.asarray(dnpEnh)
+            dnpEnh = calculate_dnp_enh(results, phase)
+            try:
+                enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
+            except Exception as e:
+                print("Error {} happened when fitting enhancements".format(e))
+                enhancementFit = False
             print(r"Fitting enhancement")
             kwargs['dnpEnh'] = dnpEnh
             kwargs['enhancementFit'] = enhancementFit
@@ -1154,14 +1157,17 @@ def make_figures(results, path='', **kwargs):
                             xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) -
                                                     min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
                             va='center', ha='right', size=9, color='red', alpha=0.6)
-        ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--',
-                label='(magn.) ' + enhancementFit['enhancementFormula'])
-        ax6.plot(enhancementFit['xdata'], enhancementFit['ydataExp'], 'g--',
-                label='(magn.) ' + enhancementFit['enhancementFormulaExp'])
-        ax6.annotate(enhancementFit['annotation'], xy=(
-            0.4, 0.5), xycoords='axes fraction', color='blue')
-        ax6.annotate(enhancementFit['annotationExp'], xy=(
-            0.55, 0.5), xycoords='axes fraction', color='green')
+        try:
+            ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--',
+                    label='(magn.) ' + enhancementFit['enhancementFormula'])
+            ax6.plot(enhancementFit['xdata'], enhancementFit['ydataExp'], 'g--',
+                    label='(magn.) ' + enhancementFit['enhancementFormulaExp'])
+            ax6.annotate(enhancementFit['annotation'], xy=(
+                0.4, 0.5), xycoords='axes fraction', color='blue')
+            ax6.annotate(enhancementFit['annotationExp'], xy=(
+                0.55, 0.5), xycoords='axes fraction', color='green')
+        except:
+            pass
         ax6.set_title('Normalized DNP enhancement')
         ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
         ax6.legend(loc='upper right', fancybox=True,
@@ -1705,18 +1711,19 @@ def find_nearest(array, values):
     return indices, array[indices]
 
 
-def calculate_dnp_enh(results):
+def calculate_dnp_enh(results, phase):
     powerMw = -1
     dnpEnh = []  # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
     dnpCounter = 0
-    [results[i] for i in range(len(results)) if results[i].magn[1][0] == min(
+    enhMinPower = [results[i] for i in range(len(results)) if results[i].magn[1][0] == min(
         [result.magn[1][0] for result in results if result.expType == 'dnp'])][0].powerMw
     for i, result in enumerate(results):
         if result.expType == 'dnp':
             if dnpCounter == 0:
                 normReal = result.real[1][0]
                 normMagn = result.magn[1][0]
-            if result.powerMw > enhMinPower:
+            if phase == 'all' and result.powerMw > enhMinPower:
+                print("phase: {}".format(phase))
                 dnpEnhLine = [result.expNum, result.powerMw, result.powerDbm, -result.real[1][0],
                               -result.real[1][0] / normReal, -result.magn[1][0], -result.magn[1][0] / normMagn]
             else:
@@ -1731,7 +1738,7 @@ def calculate_dnp_enh(results):
             dnpEnh.append(dnpEnhLine)
             dnpCounter += 1
             powerMw = result.powerMw
-    return dnpEnh
+    return np.asanyarray(dnpEnh)
 
 
 def calculate_t1_series(results):
