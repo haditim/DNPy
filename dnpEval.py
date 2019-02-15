@@ -6,7 +6,7 @@ from functions import NMRData
 foldersInDir = []
 
 # For evaluating several folders at once
-path = '/path/to/your/folder/'
+path = '/home/hadi/Desktop/20190209_PhaseCyclingTest'
 # Comment the nex line if you only want to evaluate one set of data. This is for evaluating several folders at the same time
 # foldersInDir = [os.path.join(path,d) for d in os.listdir(path) if os.path.isdir(os.path.join(path,d))]
 
@@ -23,12 +23,12 @@ kwargs = {
     'lB': 5,  # Line boradening [Hz]
     'offCor': True,  # offset correctioon
     'basCor': True,  # baseline correction
-    'evalPath': 'eval',
+    'evalPath': 'evalTestPhaseCorrection',
     'plotDpi': 100,  # plot file resolution
     'plotExts': ['jpg'],  # remove all if you do not want plots to be saved
     'make3dPlots': True,
     'process': True,
-    'debug': False,
+    'debug': True,
     'dumpToCsv': True,
     'figSize': (13, 8),
     'powerFile': powerFile,

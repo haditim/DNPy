@@ -327,14 +327,20 @@ class NMRData(object):
         self.allFid[toPos] = [
             k - np.mean(k[len(k) - totalPoints:]) for k in self.allFid[fromPos]]
 
-    def phase(self, fromPos, toPos, phase, degree=True):
+    def phase(self, fromPos, toPos, phase, applyIndex='all', degree=True):
         self.check_to_pos(toPos)
+        self.fill_to_position(fromPos, toPos)
         if degree:
             phaseFactor = np.exp(-1j * float(phase) / 180. * np.pi)
         else:
             phaseFactor = np.exp(-1j * phase)
-        self.allFid[toPos] = [
-            fid * phaseFactor for fid in self.allFid[fromPos]]
+        if applyIndex == 'all':
+            self.allFid[toPos] = [
+                fid * phaseFactor for fid in self.allFid[fromPos]]
+        else:
+            applyIndex = [applyIndex] if not type(applyIndex) == 'list' else applyIndex
+            for i in applyIndex:
+                self.allFid[toPos][i] = self.allFid[fromPos][i] * phaseFactor
 
     def auto_phase(self, fromPos, toPos, index, start, stop, scale="Hz"):
         """This function should get fromPos and index pointing to a spectrum.
@@ -353,19 +359,18 @@ class NMRData(object):
         self.phase(fromPos, toPos, phiTest[magnMin])
         return phiTest[magnMin]
 
-    def auto_phase0(self, fromPos, toPos, index, start, stop, scale="Hz"):
-        """This function should get fromPos and index pointing to a spectrum.
+    def auto_phase0(self, fromPos, toPos, phaseIndex, start, stop, applyIndex = 'all', scale="Hz"):
+        """This function should get fromPos and phaseIndex pointing to a spectrum.
         It returns the phase for maximimizing the integral over the real part
-        in the spectral region of interest, in degrees. HADI: It puts the result of
-        phasing to toPos"""
-
+        in the spectral region of interest, in degrees. 
+        HADI: It puts the result of phasing to toPos with the applyIndex indices"""
         i1, i2 = self.get_indices([start, stop], scale=scale)
         phiTest = np.linspace(0, 359, num=360)
         integrals = np.zeros(np.size(phiTest))
         for k in range(len(integrals)):
             integrals[k] = np.sum(np.real(
-                self.allFid[fromPos][index][i1:i2] * np.exp(-1j * float(phiTest[k]) / 180. * np.pi)))
-        self.phase(fromPos, toPos, phiTest[np.argmax(integrals)])
+                self.allFid[fromPos][phaseIndex][i1:i2] * np.exp(-1j * float(phiTest[k]) / 180. * np.pi)))
+        self.phase(fromPos, toPos, phiTest[np.argmax(integrals)], applyIndex=applyIndex)
         return phiTest[np.argmax(integrals)]
 
     def fwhm(self, fromPos, index, start, stop, scale="Hz"):
@@ -510,6 +515,10 @@ class NMRData(object):
     def check_to_pos(self, toPos):
         if len(self.allFid) <= toPos:
             self.allFid.append([])
+
+    def fill_to_position(self, fromPos, toPos):
+        if len(self.allFid[toPos]) < len(self.allFid[fromPos]):
+            self.allFid[toPos] = np.zeros((np.shape(self.allFid[fromPos])[0], np.shape(self.allFid[fromPos])[1]), dtype=np.complex64)
 
     def export(self, pos, count, filename, scale="Hz", xlim=[], complexType="r", fmt="%.3f"):
         if scale == "Hz":
@@ -691,10 +700,6 @@ class NMRData(object):
         self.fourier_transform(3, 4)  # FT
         """ automatic zero-order phase correction to get the phase which gives
         maximum real amplitude of spectrum at pos 3 (index 0) in frequency interval """
-        if self.autoPhase or self.expType == 't1':
-            self.ph = self.auto_phase0(4, 5, 0, -self.ftWindow, self.ftWindow)
-        else:
-            self.phase(4, 5, self.ph)  # apply phase correction
         try:
             self.phaseCycles = len(self.allFid[0]) / len(self.vdList)
             vdListLen = len(self.vdList)
@@ -710,6 +715,12 @@ class NMRData(object):
                 print('No phase cycling channel found ({}).'.format(e))
             self.phaseCycles = 1
             vdListLen = 1
+        if self.autoPhase or self.expType == 't1':
+            # 15.02.2019: Take care of phase cycling
+            for i in range(int(self.phaseCycles)):
+                self.ph = self.auto_phase0(4, 5, i, -self.ftWindow, self.ftWindow, applyIndex=[int(j*self.phaseCycles) for j in range(int(len(self.allFid[4])/self.phaseCycles))])
+        else:
+            self.phase(4, 5, self.ph)  # apply phase correction
         self.real = [[] for i in range(0, int(self.phaseCycles + 1))]
         self.magn = [[] for i in range(0, int(self.phaseCycles + 1))]
         # power, phasecycled real, phasecycles magn.
