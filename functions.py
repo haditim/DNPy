@@ -464,11 +464,11 @@ class NMRData(object):
         else:
             step = 1
         if part == "real":
-            retVal = np.sum(np.real(self.allFid[fromPos][index][i1:i2])) * step
+            retVal = sp.integrate.cumtrapz(np.real(self.allFid[fromPos][index][i1:i2]), dx=step)[-1]
         elif part == "imag":
-            retVal = np.sum(np.imag(self.allFid[fromPos][index][i1:i2])) * step
+            retVal = sp.integrate.cumtrapz(np.imag(self.allFid[fromPos][index][i1:i2]), dx=step)[-1]
         elif part == "magnitude":
-            retVal = np.sum(np.abs(self.allFid[fromPos][index][i1:i2])) * step
+            retVal = sp.integrate.cumtrapz(np.abs(self.allFid[fromPos][index][i1:i2]), dx=step)[-1]
         return retVal
 
     def integrate_all(self, fromPos, start, stop, scale="Hz", part="real"):
@@ -1732,7 +1732,6 @@ def calculate_dnp_enh(results, phase):
                 normReal = result.real[1][0]
                 normMagn = result.magn[1][0]
             if phase == 'all' and result.powerMw > enhMinPower:
-                print("phase: {}".format(phase))
                 dnpEnhLine = [result.expNum, result.powerMw, result.powerDbm, -result.real[1][0],
                               -result.real[1][0] / normReal, -result.magn[1][0], -result.magn[1][0] / normMagn]
             else:
@@ -1753,7 +1752,7 @@ def calculate_dnp_enh(results, phase):
 def calculate_t1_series(results):
     t1Series = []
     t1Counter = 0
-    for i, result in enumerate(results):
+    for result in results:
         if result.expType == 't1':
             # expNum, powerMw, powerDbm, t1, t1error
             t1Series.append([result.expNum,
