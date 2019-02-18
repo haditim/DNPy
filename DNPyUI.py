@@ -59,6 +59,7 @@ class AppWindow(baseUIWidget, baseUIClass):
         lSt1 = self.lSt1.value()
         rSt1 = self.rSt1.value()
         t1SeriesPolDeg = self.t1SeriesPolDeg.value()
+        t1ErrorTol = self.t1ErrorTol.value()
         makeFigs = self.makeFigs.isChecked()
         plotExts = []
         if makeFigs:
@@ -92,6 +93,7 @@ class AppWindow(baseUIWidget, baseUIClass):
             'powerFile': powerFile,
             't1SeriesEval': t1SeriesEval,
             't1SeriesPolDeg': t1SeriesPolDeg,
+            't1ErrorTol': t1ErrorTol,
             'kSigmaCalc': kSigmaCalc,
             'make3dPlots': make3dPlots,
         }

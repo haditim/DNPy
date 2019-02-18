@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>750</width>
-    <height>772</height>
+    <width>700</width>
+    <height>750</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -243,6 +243,9 @@
              </item>
              <item>
               <widget class="QCheckBox" name="dumpToCsv">
+               <property name="toolTip">
+                <string>This will create CSV files in the evaluation directory</string>
+               </property>
                <property name="text">
                 <string>Export results to csv</string>
                </property>
@@ -253,6 +256,9 @@
              </item>
              <item>
               <widget class="QCheckBox" name="kSigmaCalc">
+               <property name="toolTip">
+                <string>Enable only if you have done T1 series </string>
+               </property>
                <property name="text">
                 <string>Calculate kSigma</string>
                </property>
@@ -263,6 +269,9 @@
              </item>
              <item>
               <widget class="QCheckBox" name="Debug">
+               <property name="toolTip">
+                <string>Will show a lot of debugging info on each experiment</string>
+               </property>
                <property name="text">
                 <string>Debug</string>
                </property>
@@ -273,6 +282,9 @@
           </item>
           <item row="7" column="1">
            <widget class="QSpinBox" name="maxWin">
+            <property name="toolTip">
+             <string/>
+            </property>
             <property name="maximum">
              <number>100000</number>
             </property>
@@ -280,12 +292,15 @@
              <number>100</number>
             </property>
             <property name="value">
-             <number>1000</number>
+             <number>2000</number>
             </property>
            </widget>
           </item>
           <item row="7" column="0">
            <widget class="QLabel" name="maxWinLabel">
+            <property name="toolTip">
+             <string>Increase this if you have frequency drift during an ODNP run (i.e. unstable Bruker magnet)</string>
+            </property>
             <property name="text">
              <string>Maximum frequency tolerance [Hz]</string>
             </property>
@@ -477,6 +492,29 @@
             </property>
            </widget>
           </item>
+          <item row="7" column="1">
+           <widget class="QDoubleSpinBox" name="t1ErrorTol">
+            <property name="maximum">
+             <double>5.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
+            <property name="value">
+             <double>0.700000000000000</double>
+            </property>
+           </widget>
+          </item>
+          <item row="7" column="0">
+           <widget class="QLabel" name="label_6">
+            <property name="toolTip">
+             <string>T1 experiments with bigger error level will be ignored in kSigma calculations</string>
+            </property>
+            <property name="text">
+             <string>T1 error tolerance </string>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
@@ -563,6 +601,9 @@
           </item>
           <item row="3" column="1">
            <widget class="QSpinBox" name="figDpi">
+            <property name="toolTip">
+             <string>Bigger will lead to bigger file sizes</string>
+            </property>
             <property name="maximum">
              <number>1000</number>
             </property>
@@ -570,7 +611,7 @@
              <number>10</number>
             </property>
             <property name="value">
-             <number>250</number>
+             <number>100</number>
             </property>
            </widget>
           </item>

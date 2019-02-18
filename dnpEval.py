@@ -6,7 +6,7 @@ from functions import NMRData
 foldersInDir = []
 
 # For evaluating several folders at once
-path = '/home/hadi/Desktop/20190209_PhaseCyclingTest'
+path = '/home/hadi/Desktop/20190211_CWODNP_water_noN2'
 # Comment the nex line if you only want to evaluate one set of data. This is for evaluating several folders at the same time
 # foldersInDir = [os.path.join(path,d) for d in os.listdir(path) if os.path.isdir(os.path.join(path,d))]
 
@@ -28,13 +28,13 @@ kwargs = {
     'plotExts': ['jpg'],  # remove all if you do not want plots to be saved
     'make3dPlots': True,
     'process': True,
-    'debug': True,
+    'debug': False,
     'dumpToCsv': True,
     'figSize': (13, 8),
     'powerFile': powerFile,
     't1SeriesEval': True,
     't1SeriesPolDeg': 1,  # Polynomial degree for T1 series fit (default = 1)
-    't1ErrorTol': 1, # The tolerance for T1 experiment error, this is to prevent bad T1 series fits
+    't1ErrorTol': 15, # The tolerance for T1 experiment error, this is to prevent bad T1 series fits
     'kSigmaCalc': True,
     'enhCalc': True,
     }

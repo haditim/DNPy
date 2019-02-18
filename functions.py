@@ -718,9 +718,13 @@ class NMRData(object):
         if self.autoPhase or self.expType == 't1':
             # 15.02.2019: Take care of phase cycling
             for i in range(int(self.phaseCycles)):
-                self.ph = self.auto_phase0(4, 5, i, -self.ftWindow, self.ftWindow, applyIndex=[int(j*self.phaseCycles) for j in range(int(len(self.allFid[4])/self.phaseCycles))])
+                jIndex = len(self.allFid[4])/self.phaseCycles
+                applyIndex = [int(j*self.phaseCycles)+i for j in range(int(jIndex))]
+                self.ph = self.auto_phase0(4, 5, applyIndex[-1], -self.ftWindow, self.ftWindow, applyIndex=applyIndex)
         else:
             self.phase(4, 5, self.ph)  # apply phase correction
+        # real and magnitude integrals
+        # time(from vdList), integral for each channel
         self.real = [[] for i in range(0, int(self.phaseCycles + 1))]
         self.magn = [[] for i in range(0, int(self.phaseCycles + 1))]
         # power, phasecycled real, phasecycles magn.
@@ -770,16 +774,9 @@ class NMRData(object):
             self.real[int(i % self.phaseCycles) + 1].append(calIntReal)
             self.magn[int(i % self.phaseCycles) + 1].append(calIntMagn)
         # phase cycling
-        self.phaseCSigns = [+1 if i < self.phaseCycles /
-                            2. else -1 for i in range(0, int(self.phaseCycles))]
         self.phC = np.asarray(self.phC)
-        for i in range(1, int(self.phaseCycles + 1)):
-            # real channel
-            self.phC[1] = self.phC[1] + self.real[i] \
-                if self.phaseCSigns[i - 1] == +1 else self.phC[1] - self.real[i]
-            # magnitude
-            self.phC[2] = self.phC[2] + self.magn[i] \
-                if self.phaseCSigns[i - 1] == +1 else self.phC[2] - self.magn[i]
+        self.phC[1] = np.sum(self.real[1:], axis=0)
+        self.phC[2] = np.sum(self.magn[1:], axis=0)
         if self.expType == 't1':
             if self.t1Calc == 'real':  # real, magn, PCreal, PCmagn
                 self.fitData = [self.real[0], self.real[1]]
@@ -1087,6 +1084,7 @@ def make_figures(results, path='', **kwargs):
     """ Makes figures for ODNP experiment """
     dnpEnh = kwargs.get('dnpEnh', [])
     t1Series = kwargs.get('t1Series', [])
+    t1Calc = kwargs.get('t1Calc', '')
     enhancementFit = kwargs.get('enhancementFit', {})
     t1FitSeries = kwargs.get('t1FitSeries', {})
     kSigmaFit = kwargs.get('kSigmaFit', {})
@@ -1302,7 +1300,7 @@ def make_figures(results, path='', **kwargs):
             plt.errorbar(value.fitData[0], value.fitData[1],
                          yerr=(value.fitData[1] - value.t1fit['evalY']),
                          fmt='+',
-                         label='data', capthick=2, capsize=2)
+                         label='data: '+str(t1Calc), capthick=2, capsize=2)
             plt.plot(value.t1fit['xdata'], value.t1fit['ydata'],
                      label=value.t1fit['t1FitFormula'])
             plt.annotate(r'$T_1={{{:.4f}}}\pm{{{:.4f}}}$'.format(
@@ -1324,7 +1322,7 @@ def make_figures(results, path='', **kwargs):
             plt.title('Real integral of phase cycle channels of $T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
                 value.powerMw, value.ph))
             plt.plot(value.phC[0], value.phC[1], '--',
-                     label='PhaseCycled using' + str(value.phaseCSigns))
+                     label='PhaseCycled (sum after individual phasing)')
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
@@ -1340,7 +1338,7 @@ def make_figures(results, path='', **kwargs):
             plt.title('Magnitude integral of phase cycle channels of $T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
                 value.powerMw, value.ph))
             plt.plot(value.phC[0], value.phC[2], '--',
-                     label='PhaseCycled using' + str(value.phaseCSigns))
+                     label='PhaseCycled (sum after individual phasing)')
             plt.xlabel('Time (s)')
             plt.ylabel('Intensity (a.u.)')
             plt.tight_layout()
@@ -1581,7 +1579,7 @@ def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500, t1ErrorTol=
         ((np.array(intensity) - np.array(t1ir(time, *popt))) ** 2).mean())
     if np.sqrt(pcov[2, 2]) > t1ErrorTol:
         raise Exception('T1 error should not exceed t1ErrorTol value. T1 error is {:0.3} and t1ErrorTol {:0.3}'.format(
-            np.sqrt(pcov[2, 2]), t1ErrorTol))
+            np.sqrt(pcov[2, 2]), float(t1ErrorTol)))
     return {
         'xdata': xdata,
         'ydata': ydata,
