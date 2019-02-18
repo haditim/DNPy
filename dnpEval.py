@@ -6,7 +6,7 @@ from functions import NMRData
 foldersInDir = []
 
 # For evaluating several folders at once
-path = '/home/hadi/Desktop/20190211_CWODNP_water_noN2'
+path = '/path/to/odnp/folder/'
 # Comment the nex line if you only want to evaluate one set of data. This is for evaluating several folders at the same time
 # foldersInDir = [os.path.join(path,d) for d in os.listdir(path) if os.path.isdir(os.path.join(path,d))]
 
@@ -23,7 +23,7 @@ kwargs = {
     'lB': 5,  # Line boradening [Hz]
     'offCor': True,  # offset correctioon
     'basCor': True,  # baseline correction
-    'evalPath': 'evalTestPhaseCorrection',
+    'evalPath': 'eval',
     'plotDpi': 100,  # plot file resolution
     'plotExts': ['jpg'],  # remove all if you do not want plots to be saved
     'make3dPlots': True,

@@ -368,8 +368,8 @@ class NMRData(object):
         phiTest = np.linspace(0, 359, num=360)
         integrals = np.zeros(np.size(phiTest))
         for k in range(len(integrals)):
-            integrals[k] = np.sum(np.real(
-                self.allFid[fromPos][phaseIndex][i1:i2] * np.exp(-1j * float(phiTest[k]) / 180. * np.pi)))
+            integrals[k] = sp.integrate.cumtrapz(np.real(
+                self.allFid[fromPos][phaseIndex][i1:i2] * np.exp(-1j * float(phiTest[k]) / 180. * np.pi)))[-1]
         self.phase(fromPos, toPos, phiTest[np.argmax(integrals)], applyIndex=applyIndex)
         return phiTest[np.argmax(integrals)]
 
@@ -444,7 +444,7 @@ class NMRData(object):
         i1, i2 = self.get_indices([start, stop], scale=scale)
         return np.real(self.allFid[fromPos][index][i1:i2])
 
-    def integrate(self, fromPos, index, start, stop, scale="Hz", part="real"):
+    def integrate(self, fromPos, index, start, stop, scale="Hz"):
         """This function integrates the real part between start and stop. standard scale is Hz
         Arguments:
         - `fromPos`:
@@ -463,19 +463,16 @@ class NMRData(object):
             step = np.abs(self.ppmScale[1] - self.ppmScale[0])
         else:
             step = 1
-        if part == "real":
-            retVal = sp.integrate.cumtrapz(np.real(self.allFid[fromPos][index][i1:i2]), dx=step)[-1]
-        elif part == "imag":
-            retVal = sp.integrate.cumtrapz(np.imag(self.allFid[fromPos][index][i1:i2]), dx=step)[-1]
-        elif part == "magnitude":
-            retVal = sp.integrate.cumtrapz(np.abs(self.allFid[fromPos][index][i1:i2]), dx=step)[-1]
-        return retVal
-
-    def integrate_all(self, fromPos, start, stop, scale="Hz", part="real"):
-        # return all integrals by calling integrate sizeTD1 times
-        return np.array([self.integrate(fromPos, k, start, stop, scale=scale, part=part)
-                         for k in range(self.sizeTD1)])
-
+        integralImag = sp.integrate.cumtrapz(np.imag(self.allFid[fromPos][index][i1:i2]),x=self.frequency[i1:i2], dx=step, initial=0)
+        integralReal = sp.integrate.cumtrapz(np.real(self.allFid[fromPos][index][i1:i2]),x=self.frequency[i1:i2], dx=step, initial=0)
+        integralMagn = sp.integrate.cumtrapz(np.abs(self.allFid[fromPos][index][i1:i2]),x=self.frequency[i1:i2], dx=step, initial=0)
+        return{
+            'x-axis': self.frequency[i1:i2],
+            'integralReal' : integralReal,           
+            'integralImag': integralImag,
+            'integralMagn' : integralMagn,           
+        }
+        
     def get_peak(self, fromPos, index, start, stop, negative=False, scale="Hz"):
         """This function returns peak intensities in a given range;
         it searches for negative peaks if negative = True"""
@@ -740,22 +737,16 @@ class NMRData(object):
                     5, i, min(self.frequency), max(self.frequency))
             if not -self.maxWin < self.maxFreq < self.maxWin:
                 self.maxFreq = 0
-            calIntReal = self.integrate(
+            integration = self.integrate(
                 5,
                 i,
                 self.maxFreq - self.ftWindow,
                 self.maxFreq + self.ftWindow,
                 scale="Hz",
-                part="real"
             )
-            calIntMagn = self.integrate(
-                5,
-                i,
-                self.maxFreq - self.ftWindow,
-                self.maxFreq + self.ftWindow,
-                scale="Hz",
-                part="magnitude"
-            )
+            calIntReal = integration['integralReal'][-1]
+            calIntImag = integration['integralImag'][-1]
+            calIntMagn = integration['integralMagn'][-1]
             if self.debug:
                 print("Center frequency for this exp.: {}".format(self.maxFreq))
             if i % (self.phaseCycles) == 0:  # appending time values
@@ -1277,6 +1268,31 @@ def make_figures(results, path='', **kwargs):
             plt.legend(loc='best', fancybox=True,
                        shadow=True, fontsize='x-small')
             [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT.' + x)), dpi=plotDpi)
+             for x in plotExts]
+            # FT integral plots
+            figure = plt.figure(figsize=figSize)
+            plt.plot(value.frequency, np.real(
+                value.allFid[5][0]), 'g-', label='real data', )
+            plt.plot(value.frequency, np.imag(
+                value.allFid[5][0]), 'y-', label='imag data', )
+            plt.plot(value.frequency, np.abs(
+                value.allFid[5][0]), 'r-', label='magn data', )
+            plt.title('{:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
+                value.powerDbm, value.powerMw, value.ph))
+            integration = value.integrate(5,0,value.maxFreq - value.ftWindow,value.maxFreq + value.ftWindow,scale="Hz")
+            plt.plot(integration['x-axis'],integration['integralReal'], 'g--', label='real integral',)
+            plt.plot(integration['x-axis'],integration['integralImag'], 'y--', label='imag integral',)
+            plt.plot(integration['x-axis'],integration['integralMagn'], 'r--', label='magn integral',)
+            plt.title('FT+integral, {:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
+                value.powerDbm, value.powerMw, value.ph))
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.xlim(value.maxFreq - value.ftWindow,
+                     value.maxFreq + value.ftWindow)
+            plt.legend(loc='best', fancybox=True,
+                       shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT_integral.' + x)), dpi=plotDpi)
              for x in plotExts]
             plt.close(figure)
             ax4.plot(value.frequency, np.real(value.allFid[5][0]), label=(
