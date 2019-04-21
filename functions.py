@@ -1031,57 +1031,54 @@ def return_exps(path, **kwargs):
         results = list(pool.map(result_worker, dirs))
     end = time.time()
     print('{} experiments were added in {:.2} seconds'.format(len(results), end-start))
+    return results
+
+def process_exps(exps, **kwargs):
     # TODO: continue here
-    # if process:
-    #     if enhCalc and len([res for res in results if res.expType == 'dnp']) > 0:
-    #         dnpEnh = calculate_dnp_enh(results, phase)
-    #         try:
-    #             enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
-    #         except Exception as e:
-    #             print("Error {} happened when fitting enhancements".format(e))
-    #             enhancementFit = False
-    #         print(r"Fitting enhancement")
-    #         kwargs['dnpEnh'] = dnpEnh
-    #         kwargs['enhancementFit'] = enhancementFit
-    #     else:
-    #         kSigmaCalc = False
-    #         kwargs['kSigmaCalc'] = False
-    #         kwargs['enhCalc'] = False
-    #         print('No DNP exps. found, no enhancement/kSigma curve will be created.')
-    #     t1Series = calculate_t1_series(results)
-    #     if t1SeriesEval or kSigmaCalc:
-    #         if not t1Series:
-    #             print(
-    #                 'Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
-    #             t1SeriesEval = False
-    #             kwargs['t1SeriesEval'] = False
-    #             kSigmaCalc = False
-    #             kwargs['kSigmaCalc'] = False
-    #         else:
-    #             print(r"Fitting T1 series")
-    #             t1Series = np.asarray(t1Series)
-    #             kwargs['t1Series'] = t1Series
-    #             t1SeriesPolDeg = kwargs.get('t1SeriesPolDeg', 1)
-    #             t1FitSeries = fit_t1_series(
-    #                 t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
-    #             kwargs['t1FitSeries'] = t1FitSeries
-    #     if kSigmaCalc and t1SeriesEval:
-    #         print(r"Fitting kSigma")
-    #         # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
-    #         kSigmaFit = k_sigma_calc(
-    #             dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
-    #         kwargs['kSigmaFit'] = kSigmaFit
+    # phasing
+    phase = phase_dataset()
 
-    # if dumpToCsv:
-    #     print('Saving CSV files...')
-    #     dumpAllToCSV(results, path=path, **kwargs)
+    # DNP enhancement
+    if enhCalc:
+        calculate_dnp_enh(results, phase)
+    else:
+        kSigmaCalc = False
+        kwargs['kSigmaCalc'] = False
+        kwargs['enhCalc'] = False
+        print('No DNP exps. found, no enhancement/kSigma curve will be created.')
+    t1Series = calculate_t1_series(results)
+    if t1SeriesEval or kSigmaCalc:
+        if not t1Series:
+            print('Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
+            t1SeriesEval = False
+            kwargs['t1SeriesEval'] = False
+            kSigmaCalc = False
+            kwargs['kSigmaCalc'] = False
+        else:
+            print(r"Fitting T1 series")
+            t1Series = np.asarray(t1Series)
+            kwargs['t1Series'] = t1Series
+            t1SeriesPolDeg = kwargs.get('t1SeriesPolDeg', 1)
+            t1FitSeries = fit_t1_series(
+                t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
+            kwargs['t1FitSeries'] = t1FitSeries
+    if kSigmaCalc and t1SeriesEval:
+        print(r"Fitting kSigma")
+        # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
+        kSigmaFit = k_sigma_calc(
+            dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
+        kwargs['kSigmaFit'] = kSigmaFit
 
-    # if plotExts:
-    #     print('Plotting evaluation figures...')
-    #     make_figures(results, path=path, **kwargs)
+    if dumpToCsv:
+        print('Saving CSV files...')
+        dumpAllToCSV(results, path=path, **kwargs)
 
-    # print('All done')
-    # return results
+    if plotExts:
+        print('Plotting evaluation figures...')
+        make_figures(results, path=path, **kwargs)
+
+    print('All done')
+    return results
 
 
 def dumpAllToCSV(results, path, **kwargs):
@@ -1772,6 +1769,8 @@ def find_nearest(array, values):
 
 
 def calculate_dnp_enh(results, phase):
+    if len([res for res in results if res.expType == 'dnp']) < 2:
+        return False
     powerMw = -1
     dnpEnh = []  # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn
     dnpCounter = 0
@@ -1797,10 +1796,21 @@ def calculate_dnp_enh(results, phase):
             dnpEnh.append(dnpEnhLine)
             dnpCounter += 1
             powerMw = result.powerMw
-    return np.asanyarray(dnpEnh)
+    dnpEnh = np.asanyarray(dnpEnh)
+    try:
+        enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
+    except Exception as e:
+        print("Error {} happened when fitting enhancements".format(e))
+        enhancementFit = False
+    print(r"Fitting enhancement")
+    kw['dnpEnh'] = dnpEnh
+    kw['enhancementFit'] = enhancementFit
+    return True
 
 
 def calculate_t1_series(results):
+    if len([res for res in results if res.expType == 't1']) < 1:
+        return False
     t1Series = []
     t1Counter = 0
     for result in results:
@@ -1812,4 +1822,5 @@ def calculate_t1_series(results):
                              result.t1fit['t1'],
                              result.t1fit['t1error']])
             t1Counter += 1
-    return t1Series
+    kw['t1Series'] = t1Series
+    return True

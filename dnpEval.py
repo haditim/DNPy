@@ -1,6 +1,6 @@
 from typing import List
 import os
-from functions import return_exps
+from functions import return_exps, process_exps
 from functions import NMRData
 
 foldersInDir = []
@@ -46,5 +46,9 @@ if __name__ == '__main__':
     if foldersInDir:
         for path in foldersInDir:
             exps = return_exps(path, **kwargs)  # type: List[NMRData]
+            if kwargs['process']:
+                results = process_exps(exps, **kwargs)
     else:
         exps = return_exps(path, **kwargs)  # type: List[NMRData]
+        if kwargs['process']:
+            results = process_exps(exps, **kwargs)
