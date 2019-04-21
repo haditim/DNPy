@@ -1,5 +1,10 @@
 # DNPy functions file
 import datetime
+import glob
+import os
+import traceback
+import concurrent.futures
+import time
 
 import numpy as np
 import scipy as sp
@@ -9,17 +14,13 @@ from scipy.fftpack import fftshift
 from scipy.optimize import curve_fit
 from scipy import stats
 from scipy.interpolate import interp1d
-import os
-import os.path
 from matplotlib import style
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.collections import PolyCollection, LineCollection
 from matplotlib import cm
 import scipy.io as sio
-import traceback
 
 style.use('seaborn-whitegrid')
-
 
 class NMRData(object):
     """
@@ -234,8 +235,52 @@ class NMRData(object):
             self.dwellTime = dwellTime
         # HADI: I want to keep track of time after processing
         self.fidTimeHistory['orig'] = self.fidTime
+        self.power_calc(**kwargs)
         if process:
             self.process()
+    def power_calc(self, **kwargs):
+        # Calculate powers
+        if 'dBm' in self.title:
+            self.powerDbm = float(self.title.split(" ")[-2])
+            self.dbSet = None
+            self.powerMw = 10.0 ** ((self.powerDbm) / 10.0)
+        elif 'dB' in self.title:
+            self.dbSet = float(self.title[:-2].split("set ", 1)[1])
+        
+        # TODO: I removed this which is for the Han's lab for now
+        # elif 'dnpPowerMatFile' in kwargs and self.expType == 'dnp':
+        #         if dnpCounter == 0:
+        #             dnpFirstTime = self.expTime - \
+        #                 float(dnpPowerMatFile[0][0])
+        #         if kw['debug']:
+        #             print('exp time: ', datetime.datetime.fromtimestamp(self.expTime),
+        #                   ' time diff: ', datetime.datetime.fromtimestamp(
+        #                       self.expTime - dnpFirstTime),
+        #                   ' dnpCounter: ', dnpCounter,
+        #                   ' dir: ', name)
+        #         timeInd, time = find_nearest(
+        #             dnpPowerMatFile[0], self.expTime - dnpFirstTime)
+        #         self.powerDbm = float(dnpPowerMatFile[1][timeInd])
+        #         self.powerMw = 10.0 ** ((self.powerDbm + 24.445) / 10.0)
+        #     elif 't1PowerMatFile' in kwargs and self.expType == 't1':
+        #         if t1Counter == 0:
+        #             t1FirstTime = self.expTime - float(t1PowerMatFile[0][0])
+        #         self.powerDbm = float(
+        #             t1PowerMatFile[1][find_nearest(t1PowerMatFile[0], self.expTime - t1FirstTime)[0]])
+        #         self.powerMw = 10.0 ** ((self.powerDbm + 24.445) / 10.0)
+
+        else:
+            try:
+                self.dbSet = float(self.title.split()[-1])
+                self.powerDbm = kwargs['powers_dict']
+            except Exception:
+                if kw['debug']:
+                    print("Experiment %s does not have dB or dBm set in title.\
+                        So I use 60dB attenuation" % self.title)
+                self.dbSet = 60.
+                self.powerDbm = -100.
+        
+ 
 
     def offset_correction(self, fromPos, toPos, fraction=0.75, whichFid=0):
         self.check_to_pos(toPos)
@@ -697,6 +742,7 @@ class NMRData(object):
         self.fourier_transform(3, 4)  # FT
         """ automatic zero-order phase correction to get the phase which gives
         maximum real amplitude of spectrum at pos 3 (index 0) in frequency interval """
+        # TODO: take this phasing business out of the class
         try:
             self.phaseCycles = len(self.allFid[0]) / len(self.vdList)
             vdListLen = len(self.vdList)
@@ -824,229 +870,218 @@ def fwhm(x, y):
         linewidth = None
     return linewidth
 
+def result_worker(dir):
+    try:
+        result = NMRData(dir, "TopSpin", **kw)
+        result.expNum = os.path.basename(dir)
+        
+        print('Exp. {} added.'.format(os.path.basename(dir)))
+        return result
+    except Exception as e:
+        print("Problem adding {}. The error is: {}".format(os.path.basename(dir), e))
+        if kw['debug']:
+            print(traceback.format_exc())
+        pass
+
+
+def return_powers_csv(path, power_file):
+    att_power = [[], []]
+    if os.path.isfile(power_file):
+        openfile = open(power_file)
+    elif os.path.isfile(path + '/' + power_file):
+        openfile = open(path + '/' + power_file, 'r')
+    elif os.path.isfile(path + '/' + power_file + '.csv'):
+        openfile = open(path + '/' + power_file + '.csv', 'r')
+    else:
+        raise Exception("Error in reading power file. Please correct your input.")
+    lines = openfile.readlines()
+    if len(lines) == 1:
+        lines = lines[0].split('\r')
+    if len(lines[0].split('\r')[0].split(',')) == 2 and 'time' in lines[0]:
+        print('This code is not compatible with "time, power" power logging.'
+                '\nYou should have "time, dBm" or "dB, dBm" csv file.\n'
+                'I continue evaluation but probably the output will not be usable.')
+    elif len(lines[0].split('\r')[0].split(',')) == 2:
+        lines.pop(0)
+        for line in lines:
+            att, power = line.split('\r')[0].split(',')
+            att_power[0].append(float(att))
+            att_power[1].append(float(power))
+    elif len(lines[0].split('\r')[0].split(',')) == 3:
+        lines.pop(0)
+        for line in lines:
+            time, power, att = line.split('\r')[0].split(',')
+            att_power[0].append(float(att))
+            att_power[1].append(float(power))
+    else:
+        raise Exception("Could not use any power file in the directory. Aborting!")
+    att_power = np.asarray(att_power)
+    power_sets = set(att_power[0,:])
+    powers_dict = {}
+    for item in power_sets:
+        if len(att_power[1, :][att_power[0, :] == item]) > 10:
+                powers_dict[item] = np.sum(att_power[1, :][att_power[0, :] == item][10:-10]) / len(att_power[1, :][att_power[0, :] == item][10:-10])
+        elif len(att_power[1, :][att_power[0, :] == item]) != 0:
+            powers_dict[item] = np.sum(att_power[1, :][att_power[0, :] == item]) / len(att_power[1, :][att_power[0, :] == item])
+    return powers_dict
+   
+
+def return_powers_mat(path, mat_files, **kwargs):
+    """ Trying to go compatible with data from Songi Han's lab
+        I do not know why byte order in Han's lab is big endians.
+        This is to take care of that (not a good practice though). """
+    kwargs['endianness'] = np.dtype('>i4')
+    t1PowerMatFile = sio.loadmat(
+        os.path.join(path, [i for i in main_files if i.endswith('.mat') and 't1' in i][0]))
+    dnpPowerMatFile = sio.loadmat(
+        os.path.join(path, [i for i in main_files if i.endswith('.mat') and 't1' not in i][0]))
+    t1PowerMatFile = np.asarray(
+        (t1PowerMatFile['timelist'], t1PowerMatFile['powerlist']))
+    dnpPowerMatFile = np.asarray(
+        (dnpPowerMatFile['timelist'], dnpPowerMatFile['powerlist']))
+    return t1PowerMatFile, dnpPowerMatFile
+
+
+def phase_crap():
+    for i, name in enumerate(dirs):
+        exp_path = os.path.join(path, str(int(name)))
+        if (phase == 'first' and dnpCounter == 0) or phase == 'all':
+            kwargs['autoPhase'] = True
+            kwargs['ph'] = 0
+        else:
+            if phase == 'none':
+                ph = 0
+            result = NMRData(os.path.join(path, str(name).split('.')[0]),
+                                "TopSpin", autoPhase=False, ph=ph, **kwargs)
+        ph = result.ph
+        if debug:
+            print("Phase: {}".format(ph))
+        try:
+            result = result_worker(exp_path, **kwargs)
+        except Exception as e:
+            print("Problem adding exp {}. The error is: {}".format(int(name), e))
+            if kw['debug']:
+                print(traceback.format_exc())
+            continue
+        result.expNum = name
+
+def check_kwargs(path, **kwargs):
+    kwargs['debug'] = kwargs.get('debug', False)
+    kwargs['dumpToCsv'] = kwargs.get('dumpToCsv', False)
+    kwargs['powerFile'] = kwargs.get('powerFile', '')
+    kwargs['phase'] = kwargs.get('phase', 'first')
+    kwargs['plotExts'] = kwargs.get('plotExts', [])
+    kwargs['process'] = kwargs.get('process', True)
+    kwargs['t1SeriesEval'] = kwargs.get('t1SeriesEval', True)
+    kwargs['kSigmaCalc'] = kwargs.get('kSigmaCalc', True)
+    kwargs['enhCalc'] = kwargs.get('enhCalc', True)
+    kwargs['dumpToCsv'] = kwargs.get('dumpToCsv', True)
+    kwargs['evalPath'] = kwargs.get('evalPath', 'eval')
+    if os.listdir(path):
+        kwargs['filesInDir'] = os.listdir(path)
+    else:
+        raise Exception("The folder you picked for the experiment ({}) is empty.".format(path))
+    return kwargs
 
 def return_exps(path, **kwargs):
-    debug = kwargs.get('debug', False)
-    dumpToCsv = kwargs.get('dumpToCsv', False)
-    powerFile = kwargs.get('powerFile', '')
-    phase = kwargs.get('phase', 'first')
-    plotExts = kwargs.get('plotExts', [])
-    process = kwargs.get('process', True)
-    t1SeriesEval = kwargs.get('t1SeriesEval', True)
-    kSigmaCalc = kwargs.get('kSigmaCalc', True)
-    enhCalc = kwargs.get('enhCalc', True)
-    dumpToCsv = kwargs.get('dumpToCsv', True)
-    filesInDir = os.listdir(path)
+    global kw
+    kw = check_kwargs(path, **kwargs)
+    # inits
     dirs = []
-    results = []
-    attPower = [[], []]
-    evalPath = kwargs.get('evalPath', 'eval')
-    dnpCounter = 0
-    t1Counter = 0
-    try:  # Taking care of evaluation dir
-        os.mkdir(os.path.join(path, evalPath))
+    # We do not use these names anymore, this is for Han's lab
+    ignore_list = [304, 503, 700, 701]
+    # Taking care of evaluation dir
+    try:  
+        os.mkdir(os.path.join(path, kw['evalPath']))
     except Exception as e:
         if '17' not in str(e):
             print('{} occured when trying to create evalPath'.format(e))
         pass
-    """ Plots ind. experiments and calculate T1, enhancement, etc. """
+    # Plots ind. experiments and calculate T1, enhancement, etc.
     if not os.path.isdir(path):
         print('Error: the folder does not exist.')
         return False
-    for name in filesInDir:
-        # We do not use these names anymore, this is for Han's lab
-        if '304' not in name and '503' not in name and '700' not in name and '701' not in name:
-            try:
-                dirs.append(float(name))
-            except Exception as e:
-                if debug:
-                    print('{} not NMR experiment({}).'.format(name, e))
-    if not dirs:
-        print('Error: the folder does not contain any NMR experiments.')
-        return False
-    dirs.sort()
-    mainFiles = os.listdir(path)
-    matFiles = [i for i in mainFiles if i.endswith('.mat')]
-    # Taking care of powers csv file
-    if powerFile:
+    for name in kw['filesInDir']:
         try:
-            openfile = open(powerFile)
-        except:
-            try:
-                openfile = open(path + '/' + powerFile + '.csv', 'r')
-            except:
-                openfile = open(path + '/' + powerFile, 'r')
-        lines = openfile.readlines()
-        if len(lines) == 1:
-            lines = lines[0].split('\r')
-        if len(lines[0].split('\r')[0].split(',')) == 2 and 'time' in lines[0]:
-            print('This code is not compatible with "time, power" power logging.'
-                  '\nYou should have "time, dBm" or "dB, dBm" csv file.\n'
-                  'I continue evaluation but probably the output will not be usable.')
-        elif len(lines[0].split('\r')[0].split(',')) == 2:
-            lines.pop(0)
-            for line in lines:
-                att, power = line.split('\r')[0].split(',')
-                attPower[0].append(float(att))
-                attPower[1].append(float(power))
-        elif len(lines[0].split('\r')[0].split(',')) == 3:
-            lines.pop(0)
-            for line in lines:
-                time, power, att = line.split('\r')[0].split(',')
-                attPower[0].append(float(att))
-                attPower[1].append(float(power))
-        else:
-            print("Could not use any power file in the directory. Aborting!")
-    else:
-        if debug:
-            print("Proceding without powers file.")
-        # Trying to go compatible with data from Songi Han's lab
-        if matFiles:
-            # I do not know why byte order in Han's lab is big endians.
-            # This is to take care of that (not a good practice though).
-            kwargs['endianness'] = np.dtype('>i4')
-            t1PowerMatFile = sio.loadmat(
-                os.path.join(path, [i for i in mainFiles if i.endswith('.mat') and 't1' in i][0]))
-            dnpPowerMatFile = sio.loadmat(
-                os.path.join(path, [i for i in mainFiles if i.endswith('.mat') and 't1' not in i][0]))
-            t1PowerMatFile = np.asarray(
-                (t1PowerMatFile['timelist'], t1PowerMatFile['powerlist']))
-            dnpPowerMatFile = np.asarray(
-                (dnpPowerMatFile['timelist'], dnpPowerMatFile['powerlist']))
-
-    attPower = np.asarray(attPower)
-    # Preparing experiment data
-    for i, name in enumerate(dirs):
-        try:
-            if (phase == 'first' and dnpCounter == 0) or phase == 'all':
-                result = NMRData(os.path.join(path, str(name).split('.')[0]),
-                                 "TopSpin", autoPhase=True, ph=0, **kwargs)
-            else:
-                if phase == 'none':
-                    ph = 0
-                result = NMRData(os.path.join(path, str(name).split('.')[0]),
-                                 "TopSpin", autoPhase=False, ph=ph, **kwargs)
-            ph = result.ph
-            if debug:
-                print("Phase: {}".format(ph))
+            name = int(name)
+            if name not in ignore_list:
+                dirs.append(name)
         except Exception as e:
-            print("Problem adding exp {}. The error is: {}".format(int(name), e))
-            if debug:
-                print(traceback.format_exc())
-            continue
-        result.expNum = name
-        # Calculate powers
-        if 'dBm' in result.title:
-            result.powerDbm = float(result.title.split(" ")[-2])
-            result.dbSet = None
-            result.powerMw = 10.0 ** ((result.powerDbm) / 10.0)
-        elif 'dB' in result.title:
-            result.dbSet = float(result.title[:-2].split("set ", 1)[1])
-        # for old times when I did not put dB in title, also done in Han's lab
-        elif result.expType:
-            if powerFile:
-                try:
-                    result.dbSet = float(result.title.split()[-1])
-                except Exception:
-                    if debug:
-                        print("Experiment %s does not have dB or dBm set in title.\
-                          So I use 60dB attenuation" % result.title)
-                    result.dbSet = 60.
-                    result.powerDbm = 0.
-                # This is for when Ryans code is used and we have discrepencies
-                if len(attPower[1, :][attPower[0, :] == result.dbSet]) > 10:
-                    result.powerDbm = np.sum(attPower[1, :][attPower[0, :] ==
-                                                            result.dbSet][10:20]) / len(
-                        attPower[1, :][attPower[0, :] == result.dbSet][10:20])
-                elif len(attPower[1, :][attPower[0, :] == result.dbSet]) != 0:
-                    result.powerDbm = np.sum(attPower[1, :][attPower[0, :] == result.dbSet]) / len(
-                        attPower[1, :][attPower[0, :] == result.dbSet])
-                else:
-                    if result.dbSet >= 40.:
-                        result.powerDbm = -99.0
-                        if debug:
-                            print('I could not find power for {:.0f} dB so I use -99 dBm'.
-                                  format(result.dbSet))
-                    else:
-                        print('I could not find power for {:.0f} dB and I won\'t be using it'.
-                              format(result.dbSet))
-            elif result.expType == 'dnp' and matFiles:
-                if dnpCounter == 0:
-                    dnpFirstTime = result.expTime - \
-                        float(dnpPowerMatFile[0][0])
-                if debug:
-                    print('exp time: ', datetime.datetime.fromtimestamp(result.expTime),
-                          ' time diff: ', datetime.datetime.fromtimestamp(
-                              result.expTime - dnpFirstTime),
-                          ' dnpCounter: ', dnpCounter,
-                          ' dir: ', name)
-                timeInd, time = find_nearest(
-                    dnpPowerMatFile[0], result.expTime - dnpFirstTime)
-                result.powerDbm = float(dnpPowerMatFile[1][timeInd])
-                result.powerMw = 10.0 ** ((result.powerDbm + 24.445) / 10.0)
-            elif result.expType == 't1' and matFiles:
-                if t1Counter == 0:
-                    t1FirstTime = result.expTime - float(t1PowerMatFile[0][0])
-                result.powerDbm = float(
-                    t1PowerMatFile[1][find_nearest(t1PowerMatFile[0], result.expTime - t1FirstTime)[0]])
-                result.powerMw = 10.0 ** ((result.powerDbm + 24.445) / 10.0)
+            if kw['debug']:
+                print('{} not NMR experiment({}).'.format(name, e))
+            pass
+            
+    if not dirs:
+        raise Exception('The folder does not contain any NMR experiments.')
+    # sort and append path to dirs
+    dirs = [os.path.join(path, str(dir)) for dir in sorted(dirs)]
+    # Calculate powers the old way
+    mat_files = glob.glob(os.path.join(path,'')+'*.mat')
+    if kw['powerFile']:
+        kw['powers_dict'] = return_powers_csv(path, kw['powerFile'])
+    elif mat_files:
+        kw['t1PowerMatFile'], kw['dnpPowerMatFile'] = return_powers_mat(path, mat_files, **kwargs)
+    
+    # Preparing experiment data
+    start = time.time()
+    # Single process
+    # results = [result_worker(dir) for dir in dirs]  
+    # Multi-thread. Unfortunately, ProcessPoolExecutor cannot be used here since we pass unpickelable data
+    with concurrent.futures.ThreadPoolExecutor() as pool:  
+        results = list(pool.map(result_worker, dirs))
+    end = time.time()
+    print('{} experiments were added in {:.2} seconds'.format(len(results), end-start))
+    # TODO: continue here
+    # if process:
+    #     if enhCalc and len([res for res in results if res.expType == 'dnp']) > 0:
+    #         dnpEnh = calculate_dnp_enh(results, phase)
+    #         try:
+    #             enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
+    #         except Exception as e:
+    #             print("Error {} happened when fitting enhancements".format(e))
+    #             enhancementFit = False
+    #         print(r"Fitting enhancement")
+    #         kwargs['dnpEnh'] = dnpEnh
+    #         kwargs['enhancementFit'] = enhancementFit
+    #     else:
+    #         kSigmaCalc = False
+    #         kwargs['kSigmaCalc'] = False
+    #         kwargs['enhCalc'] = False
+    #         print('No DNP exps. found, no enhancement/kSigma curve will be created.')
+    #     t1Series = calculate_t1_series(results)
+    #     if t1SeriesEval or kSigmaCalc:
+    #         if not t1Series:
+    #             print(
+    #                 'Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
+    #             t1SeriesEval = False
+    #             kwargs['t1SeriesEval'] = False
+    #             kSigmaCalc = False
+    #             kwargs['kSigmaCalc'] = False
+    #         else:
+    #             print(r"Fitting T1 series")
+    #             t1Series = np.asarray(t1Series)
+    #             kwargs['t1Series'] = t1Series
+    #             t1SeriesPolDeg = kwargs.get('t1SeriesPolDeg', 1)
+    #             t1FitSeries = fit_t1_series(
+    #                 t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
+    #             kwargs['t1FitSeries'] = t1FitSeries
+    #     if kSigmaCalc and t1SeriesEval:
+    #         print(r"Fitting kSigma")
+    #         # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
+    #         kSigmaFit = k_sigma_calc(
+    #             dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
+    #         kwargs['kSigmaFit'] = kSigmaFit
 
-        if not result.powerMw:
-            result.powerMw = 10.0 ** ((result.powerDbm + 19.4639) / 10.0)
-        print("Evaluated {}: {}({})\t @{:.3f}W, phase {}".format(
-            int(result.expNum), result.title, result.expType, result.powerMw / 1000, int(ph)))
-        results.append(result)
+    # if dumpToCsv:
+    #     print('Saving CSV files...')
+    #     dumpAllToCSV(results, path=path, **kwargs)
 
-    if process:
-        if enhCalc and len([res for res in results if res.expType == 'dnp']) > 0:
-            dnpEnh = calculate_dnp_enh(results, phase)
-            try:
-                enhancementFit = fit_enhancement(dnpEnh[:, 1], dnpEnh[:, 6])
-            except Exception as e:
-                print("Error {} happened when fitting enhancements".format(e))
-                enhancementFit = False
-            print(r"Fitting enhancement")
-            kwargs['dnpEnh'] = dnpEnh
-            kwargs['enhancementFit'] = enhancementFit
-        else:
-            kSigmaCalc = False
-            kwargs['kSigmaCalc'] = False
-            kwargs['enhCalc'] = False
-            print('No DNP exps. found, no enhancement/kSigma curve will be created.')
-        t1Series = calculate_t1_series(results)
-        if t1SeriesEval or kSigmaCalc:
-            if not t1Series:
-                print(
-                    'Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
-                t1SeriesEval = False
-                kwargs['t1SeriesEval'] = False
-                kSigmaCalc = False
-                kwargs['kSigmaCalc'] = False
-            else:
-                print(r"Fitting T1 series")
-                t1Series = np.asarray(t1Series)
-                kwargs['t1Series'] = t1Series
-                t1SeriesPolDeg = kwargs.get('t1SeriesPolDeg', 1)
-                t1FitSeries = fit_t1_series(
-                    t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
-                kwargs['t1FitSeries'] = t1FitSeries
-        if kSigmaCalc and t1SeriesEval:
-            print(r"Fitting kSigma")
-            # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
-            kSigmaFit = k_sigma_calc(
-                dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
-            kwargs['kSigmaFit'] = kSigmaFit
+    # if plotExts:
+    #     print('Plotting evaluation figures...')
+    #     make_figures(results, path=path, **kwargs)
 
-    if dumpToCsv:
-        print('Saving CSV files...')
-        dumpAllToCSV(results, path=path, **kwargs)
-
-    if plotExts:
-        print('Plotting evaluation figures...')
-        make_figures(results, path=path, **kwargs)
-
-    print('All done')
-    return results
+    # print('All done')
+    # return results
 
 
 def dumpAllToCSV(results, path, **kwargs):
