@@ -22,6 +22,7 @@ import scipy.io as sio
 
 style.use('seaborn-whitegrid')
 
+
 class NMRData(object):
     """
     NMRData objects is used to import and store NMRData from several file formats.
@@ -233,11 +234,12 @@ class NMRData(object):
                 else:
                     pass
             self.dwellTime = dwellTime
+            self.expNum = os.path.basename(directory)
+        self.calculate_phase_cycles()
         # HADI: I want to keep track of time after processing
         self.fidTimeHistory['orig'] = self.fidTime
         self.power_calc(**kwargs)
-        if process:
-            self.process()
+
     def power_calc(self, **kwargs):
         # Calculate powers
         if 'dBm' in self.title:
@@ -246,7 +248,7 @@ class NMRData(object):
             self.powerMw = 10.0 ** ((self.powerDbm) / 10.0)
         elif 'dB' in self.title:
             self.dbSet = float(self.title[:-2].split("set ", 1)[1])
-        
+
         # TODO: I removed this which is for the Han's lab for now
         # elif 'dnpPowerMatFile' in kwargs and self.expType == 'dnp':
         #         if dnpCounter == 0:
@@ -279,8 +281,6 @@ class NMRData(object):
                         So I use 60dB attenuation" % self.title)
                 self.dbSet = 60.
                 self.powerDbm = -100.
-        
- 
 
     def offset_correction(self, fromPos, toPos, fraction=0.75, whichFid=0):
         self.check_to_pos(toPos)
@@ -383,7 +383,8 @@ class NMRData(object):
             self.allFid[toPos] = [
                 fid * phaseFactor for fid in self.allFid[fromPos]]
         else:
-            applyIndex = [applyIndex] if not type(applyIndex) == 'list' else applyIndex
+            applyIndex = [applyIndex] if not type(
+                applyIndex) == 'list' else applyIndex
             for i in applyIndex:
                 self.allFid[toPos][i] = self.allFid[fromPos][i] * phaseFactor
 
@@ -404,7 +405,7 @@ class NMRData(object):
         self.phase(fromPos, toPos, phiTest[magnMin])
         return phiTest[magnMin]
 
-    def auto_phase0(self, fromPos, toPos, phaseIndex, start, stop, applyIndex = 'all', scale="Hz"):
+    def auto_phase0(self, fromPos, toPos, phaseIndex, start, stop, applyIndex='all', scale="Hz"):
         """This function should get fromPos and phaseIndex pointing to a spectrum.
         It returns the phase for maximimizing the integral over the real part
         in the spectral region of interest, in degrees. 
@@ -415,7 +416,8 @@ class NMRData(object):
         for k in range(len(integrals)):
             integrals[k] = sp.integrate.cumtrapz(np.real(
                 self.allFid[fromPos][phaseIndex][i1:i2] * np.exp(-1j * float(phiTest[k]) / 180. * np.pi)))[-1]
-        self.phase(fromPos, toPos, phiTest[np.argmax(integrals)], applyIndex=applyIndex)
+        self.phase(fromPos, toPos, phiTest[np.argmax(
+            integrals)], applyIndex=applyIndex)
         return phiTest[np.argmax(integrals)]
 
     def fwhm(self, fromPos, index, start, stop, scale="Hz"):
@@ -508,16 +510,19 @@ class NMRData(object):
             step = np.abs(self.ppmScale[1] - self.ppmScale[0])
         else:
             step = 1
-        integralImag = sp.integrate.cumtrapz(np.imag(self.allFid[fromPos][index][i1:i2]),x=self.frequency[i1:i2], dx=step, initial=0)
-        integralReal = sp.integrate.cumtrapz(np.real(self.allFid[fromPos][index][i1:i2]),x=self.frequency[i1:i2], dx=step, initial=0)
-        integralMagn = sp.integrate.cumtrapz(np.abs(self.allFid[fromPos][index][i1:i2]),x=self.frequency[i1:i2], dx=step, initial=0)
+        integralImag = sp.integrate.cumtrapz(np.imag(
+            self.allFid[fromPos][index][i1:i2]), x=self.frequency[i1:i2], dx=step, initial=0)
+        integralReal = sp.integrate.cumtrapz(np.real(
+            self.allFid[fromPos][index][i1:i2]), x=self.frequency[i1:i2], dx=step, initial=0)
+        integralMagn = sp.integrate.cumtrapz(np.abs(
+            self.allFid[fromPos][index][i1:i2]), x=self.frequency[i1:i2], dx=step, initial=0)
         return{
             'x-axis': self.frequency[i1:i2],
-            'integralReal' : integralReal,           
+            'integralReal': integralReal,
             'integralImag': integralImag,
-            'integralMagn' : integralMagn,           
+            'integralMagn': integralMagn,
         }
-        
+
     def get_peak(self, fromPos, index, start, stop, negative=False, scale="Hz"):
         """This function returns peak intensities in a given range;
         it searches for negative peaks if negative = True"""
@@ -560,7 +565,8 @@ class NMRData(object):
 
     def fill_to_position(self, fromPos, toPos):
         if len(self.allFid[toPos]) < len(self.allFid[fromPos]):
-            self.allFid[toPos] = np.zeros((np.shape(self.allFid[fromPos])[0], np.shape(self.allFid[fromPos])[1]), dtype=np.complex64)
+            self.allFid[toPos] = np.zeros((np.shape(self.allFid[fromPos])[0], np.shape(
+                self.allFid[fromPos])[1]), dtype=np.complex64)
 
     def export(self, pos, count, filename, scale="Hz", xlim=[], complexType="r", fmt="%.3f"):
         if scale == "Hz":
@@ -719,6 +725,23 @@ class NMRData(object):
     def get_index_from_ppm(self, value):
         return np.argmin(abs(self.ppmScale - ppm))
 
+    def calculate_phase_cycles(self):
+        try:
+            self.phaseCycles = len(self.allFid[0]) / len(self.vdList)
+            vdListLen = len(self.vdList)
+            if int(self.phaseCycles) != self.phaseCycles:
+                raise ValueError
+        except ValueError:
+            print('Exp. {}: The number of FIDs ({}) and vdList ({}) do not match. '
+                  'There should have been a problem in your experiment'.format(self.title, len(self.allFid[0]),
+                                                                               len(self.vdList)))
+            pass
+        except Exception as e:
+            if self.debug:
+                print('No phase cycling channel found ({}).'.format(e))
+            self.phaseCycles = 1
+            vdListLen = 1
+
     def process(self):
         """ Process routine for DNP enhancement, k_sigma and T1 data. """
         if self.expType == 't1':
@@ -742,30 +765,8 @@ class NMRData(object):
         self.fourier_transform(3, 4)  # FT
         """ automatic zero-order phase correction to get the phase which gives
         maximum real amplitude of spectrum at pos 3 (index 0) in frequency interval """
-        # TODO: take this phasing business out of the class
-        try:
-            self.phaseCycles = len(self.allFid[0]) / len(self.vdList)
-            vdListLen = len(self.vdList)
-            if int(self.phaseCycles) != self.phaseCycles:
-                raise ValueError
-        except ValueError:
-            print('Exp. {}: The number of FIDs ({}) and vdList ({}) do not match. '
-                  'There should have been a problem in your experiment'.format(self.title, len(self.allFid[0]),
-                                                                               len(self.vdList)))
-            pass
-        except Exception as e:
-            if self.debug:
-                print('No phase cycling channel found ({}).'.format(e))
-            self.phaseCycles = 1
-            vdListLen = 1
-        if self.autoPhase or self.expType == 't1':
-            # 15.02.2019: Take care of phase cycling
-            for i in range(int(self.phaseCycles)):
-                jIndex = len(self.allFid[4])/self.phaseCycles
-                applyIndex = [int(j*self.phaseCycles)+i for j in range(int(jIndex))]
-                self.ph = self.auto_phase0(4, 5, applyIndex[-1], -self.ftWindow, self.ftWindow, applyIndex=applyIndex)
-        else:
-            self.phase(4, 5, self.ph)  # apply phase correction
+
+    def calculate_exp_integral(self):
         # real and magnitude integrals
         # time(from vdList), integral for each channel
         self.real = [[] for i in range(0, int(self.phaseCycles + 1))]
@@ -870,18 +871,26 @@ def fwhm(x, y):
         linewidth = None
     return linewidth
 
+
 def result_worker(dir):
     try:
         result = NMRData(dir, "TopSpin", **kw)
-        result.expNum = os.path.basename(dir)
-        
         print('Exp. {} added.'.format(os.path.basename(dir)))
+        print(result)
         return result
     except Exception as e:
-        print("Problem adding {}. The error is: {}".format(os.path.basename(dir), e))
-        if kw['debug']:
-            print(traceback.format_exc())
-        pass
+        print("Problem adding {}. The error is: {}".format(
+            os.path.basename(dir), e))
+        # if kw['debug']:
+        print(traceback.format_exc())
+        # pass
+
+
+def exp_process_worker(exp):
+    exp.process()
+
+def exp_integrate_worker(exp):
+    exp.calculate_exp_integral()
 
 
 def return_powers_csv(path, power_file):
@@ -893,14 +902,15 @@ def return_powers_csv(path, power_file):
     elif os.path.isfile(path + '/' + power_file + '.csv'):
         openfile = open(path + '/' + power_file + '.csv', 'r')
     else:
-        raise Exception("Error in reading power file. Please correct your input.")
+        raise Exception(
+            "Error in reading power file. Please correct your input.")
     lines = openfile.readlines()
     if len(lines) == 1:
         lines = lines[0].split('\r')
     if len(lines[0].split('\r')[0].split(',')) == 2 and 'time' in lines[0]:
         print('This code is not compatible with "time, power" power logging.'
-                '\nYou should have "time, dBm" or "dB, dBm" csv file.\n'
-                'I continue evaluation but probably the output will not be usable.')
+              '\nYou should have "time, dBm" or "dB, dBm" csv file.\n'
+              'I continue evaluation but probably the output will not be usable.')
     elif len(lines[0].split('\r')[0].split(',')) == 2:
         lines.pop(0)
         for line in lines:
@@ -914,17 +924,20 @@ def return_powers_csv(path, power_file):
             att_power[0].append(float(att))
             att_power[1].append(float(power))
     else:
-        raise Exception("Could not use any power file in the directory. Aborting!")
+        raise Exception(
+            "Could not use any power file in the directory. Aborting!")
     att_power = np.asarray(att_power)
-    power_sets = set(att_power[0,:])
+    power_sets = set(att_power[0, :])
     powers_dict = {}
     for item in power_sets:
         if len(att_power[1, :][att_power[0, :] == item]) > 10:
-                powers_dict[item] = np.sum(att_power[1, :][att_power[0, :] == item][10:-10]) / len(att_power[1, :][att_power[0, :] == item][10:-10])
+            powers_dict[item] = np.sum(att_power[1, :][att_power[0, :] == item][10:-10]) / len(
+                att_power[1, :][att_power[0, :] == item][10:-10])
         elif len(att_power[1, :][att_power[0, :] == item]) != 0:
-            powers_dict[item] = np.sum(att_power[1, :][att_power[0, :] == item]) / len(att_power[1, :][att_power[0, :] == item])
+            powers_dict[item] = np.sum(
+                att_power[1, :][att_power[0, :] == item]) / len(att_power[1, :][att_power[0, :] == item])
     return powers_dict
-   
+
 
 def return_powers_mat(path, mat_files, **kwargs):
     """ Trying to go compatible with data from Songi Han's lab
@@ -942,28 +955,32 @@ def return_powers_mat(path, mat_files, **kwargs):
     return t1PowerMatFile, dnpPowerMatFile
 
 
-def phase_crap():
-    for i, name in enumerate(dirs):
-        exp_path = os.path.join(path, str(int(name)))
-        if (phase == 'first' and dnpCounter == 0) or phase == 'all':
-            kwargs['autoPhase'] = True
-            kwargs['ph'] = 0
-        else:
-            if phase == 'none':
-                ph = 0
-            result = NMRData(os.path.join(path, str(name).split('.')[0]),
-                                "TopSpin", autoPhase=False, ph=ph, **kwargs)
-        ph = result.ph
-        if debug:
-            print("Phase: {}".format(ph))
-        try:
-            result = result_worker(exp_path, **kwargs)
-        except Exception as e:
-            print("Problem adding exp {}. The error is: {}".format(int(name), e))
-            if kw['debug']:
-                print(traceback.format_exc())
-            continue
-        result.expNum = name
+def phase_dataset(results):
+    """This is supposed to phase the dataset accroding to the kw['phase'] variable"""
+    if kw['phase'] == 'first':
+        exp = [result for result in results if result.expType == 'dnp'][0]
+        for i in range(int(exp.phaseCycles)):
+            jIndex = len(exp.allFid[4])/exp.phaseCycles
+            applyIndex = [int(j*exp.phaseCycles)+i for j in range(int(jIndex))]
+            exp.ph = exp.auto_phase0(
+                4, 5, applyIndex[-1], -exp.ftWindow, exp.ftWindow, applyIndex=applyIndex)
+            phase = exp.ph
+    for i, exp in enumerate(results):
+        if kw['phase'] == 'all' or exp.expType == 't1':
+            for i in range(int(exp.phaseCycles)):
+                jIndex = len(exp.allFid[4])/exp.phaseCycles
+                applyIndex = [int(j*exp.phaseCycles) +
+                              i for j in range(int(jIndex))]
+                exp.ph = exp.auto_phase0(
+                    4, 5, applyIndex[-1], -exp.ftWindow, exp.ftWindow, applyIndex=applyIndex)
+                phase = 0
+        elif kw['phase'] == 'first':
+            exp.phase(4, 5, phase)
+        if kw['phase'] == 'none':
+            phase = 0
+            exp.phase(4, 5, phase)
+    return phase
+
 
 def check_kwargs(path, **kwargs):
     kwargs['debug'] = kwargs.get('debug', False)
@@ -980,8 +997,10 @@ def check_kwargs(path, **kwargs):
     if os.listdir(path):
         kwargs['filesInDir'] = os.listdir(path)
     else:
-        raise Exception("The folder you picked for the experiment ({}) is empty.".format(path))
+        raise Exception(
+            "The folder you picked for the experiment ({}) is empty.".format(path))
     return kwargs
+
 
 def return_exps(path, **kwargs):
     global kw
@@ -991,7 +1010,7 @@ def return_exps(path, **kwargs):
     # We do not use these names anymore, this is for Han's lab
     ignore_list = [304, 503, 700, 701]
     # Taking care of evaluation dir
-    try:  
+    try:
         os.mkdir(os.path.join(path, kw['evalPath']))
     except Exception as e:
         if '17' not in str(e):
@@ -1010,96 +1029,89 @@ def return_exps(path, **kwargs):
             if kw['debug']:
                 print('{} not NMR experiment({}).'.format(name, e))
             pass
-            
+
     if not dirs:
         raise Exception('The folder does not contain any NMR experiments.')
     # sort and append path to dirs
     dirs = [os.path.join(path, str(dir)) for dir in sorted(dirs)]
     # Calculate powers the old way
-    mat_files = glob.glob(os.path.join(path,'')+'*.mat')
+    mat_files = glob.glob(os.path.join(path, '')+'*.mat')
     if kw['powerFile']:
         kw['powers_dict'] = return_powers_csv(path, kw['powerFile'])
     elif mat_files:
-        kw['t1PowerMatFile'], kw['dnpPowerMatFile'] = return_powers_mat(path, mat_files, **kwargs)
-    
+        kw['t1PowerMatFile'], kw['dnpPowerMatFile'] = return_powers_mat(
+            path, mat_files, **kwargs)
+
     # Preparing experiment data
     start = time.time()
     # Single process
-    # results = [result_worker(dir) for dir in dirs]  
+    # results = [result_worker(dir) for dir in dirs]
     # Multi-thread. Unfortunately, ProcessPoolExecutor cannot be used here since we pass unpickelable data
-    with concurrent.futures.ThreadPoolExecutor() as pool:  
-        results = list(pool.map(result_worker, dirs))
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        results = pool.map(result_worker, dirs)
     end = time.time()
-    print('{} experiments were added in {:.2} seconds'.format(len(results), end-start))
+    results = [result for result in results if not result == None]
+    print('{} experiments were added in {:.2} seconds'.format(
+        len(results), end-start))
+    if kw['process']:
+        process_exps(results, path)
     return results
 
-def process_exps(exps, **kwargs):
-    # TODO: continue here
+
+def process_exps(results, path):
+    # TODO
     # phasing
-    phase = phase_dataset()
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        pool.map(exp_process_worker, results)
+    phase = phase_dataset(results)
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        pool.map(exp_integrate_worker, results)
 
     # DNP enhancement
-    if enhCalc:
+    if kw['enhCalc']:
+        print(r"Fitting enhancement")
         calculate_dnp_enh(results, phase)
     else:
-        kSigmaCalc = False
-        kwargs['kSigmaCalc'] = False
-        kwargs['enhCalc'] = False
+        kw['kSigmaCalc'] = False
+        kw['enhCalc'] = False
         print('No DNP exps. found, no enhancement/kSigma curve will be created.')
-    t1Series = calculate_t1_series(results)
-    if t1SeriesEval or kSigmaCalc:
-        if not t1Series:
-            print('Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
-            t1SeriesEval = False
-            kwargs['t1SeriesEval'] = False
-            kSigmaCalc = False
-            kwargs['kSigmaCalc'] = False
-        else:
-            print(r"Fitting T1 series")
-            t1Series = np.asarray(t1Series)
-            kwargs['t1Series'] = t1Series
-            t1SeriesPolDeg = kwargs.get('t1SeriesPolDeg', 1)
-            t1FitSeries = fit_t1_series(
-                t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
-            kwargs['t1FitSeries'] = t1FitSeries
-    if kSigmaCalc and t1SeriesEval:
+    if kw['t1SeriesEval'] or kw['kSigmaCalc']:
+        print(r"Fitting T1")
+        calculate_t1_series(results)
+        if not kw['t1Series']:
+            print(
+                'Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
+            kw['t1SeriesEval'] = False
+            kw['kSigmaCalc'] = False
+    if kw['kSigmaCalc'] and kw['t1SeriesEval']:
         print(r"Fitting kSigma")
         # expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
-        kSigmaFit = k_sigma_calc(
-            dnpEnh[:, 1], dnpEnh[:, 6], t1FitSeries['fit'], t1FitSeries['coefs'])
-        kwargs['kSigmaFit'] = kSigmaFit
+        kw['kSigmaFit'] = k_sigma_calc()
 
-    if dumpToCsv:
+    if kw['dumpToCsv']:
         print('Saving CSV files...')
-        dumpAllToCSV(results, path=path, **kwargs)
+        dumpAllToCSV(results, path=path)
 
-    if plotExts:
+    if kw['plotExts']:
         print('Plotting evaluation figures...')
-        make_figures(results, path=path, **kwargs)
+        make_figures(results, path=path)
 
     print('All done')
     return results
 
 
-def dumpAllToCSV(results, path, **kwargs):
-    evalPath = kwargs.get('evalPath', 'eval')
-    dnpEnh = kwargs.get('dnpEnh', [])
-    t1Series = kwargs.get('t1Series', [])
-    kSigmaFit = kwargs.get('kSigmaFit', {})
-    evalPath = kwargs.get('evalPath', 'eval')
-    t1SeriesEval = kwargs.get('t1SeriesEval', True)
-    kSigmaCalc = kwargs.get('kSigmaCalc', True)
+def dumpAllToCSV(results, path):
     # dnpEnh: expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
-    np.savetxt(os.path.join(path, evalPath, 'enhancements.csv'), dnpEnh, delimiter='\t',
+    np.savetxt(os.path.join(path, kw['evalPath'], 'enhancements.csv'), kw['dnpEnh'], delimiter='\t',
                header=('expNum\tpowerMw\tpowerDbm\tintReal\tnormIntReal\tintMagn\tnormIntMagn\tforward'))
-    # t1Series expNum, powerMw, powerDbm, t1, t1error
-    if t1SeriesEval:
-        np.savetxt(os.path.join(path, evalPath, 't1series.csv'), t1Series, delimiter='\t',
+    # t1Series: expNum, powerMw, powerDbm, t1, t1error
+    if kw['t1SeriesEval']:
+        np.savetxt(os.path.join(path, kw['evalPath'], kw['t1series']+'.csv'), kw['t1Series'], delimiter='\t',
                    header=('expNum\tpowerMw\tpowerDbm\tt1\tt1error'))
-        if kSigmaCalc:
-            np.savetxt(os.path.join(path, evalPath, 'ksigma.csv'),
+        if kw['kSigmaCalc']:
+            np.savetxt(os.path.join(path, kw['evalPath'], 'ksigma.csv'),
                        np.asarray(
-                           (dnpEnh[:, 1], kSigmaFit['kSigmaCor'], kSigmaFit['kSigmaUncor'])).transpose(),
+                           (kw['dnpEnh'][:, 1], kw['kSigmaFit']['kSigmaCor'], kw['kSigmaFit']['kSigmaUncor'])).transpose(),
                        delimiter='\t', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
 
 
@@ -1169,31 +1181,31 @@ def make_figures(results, path='', **kwargs):
         colors = [cm.jet(inter(x)) for x in powers]
         # DNP enhancement
         ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                        == 1][:, 6], 'bo', marker="o", label='forward magn.')
+                                                         == 1][:, 6], 'bo', marker="o", label='forward magn.')
         ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                        == 0][:, 6], 'ro', marker="o", label='backward magn')
+                                                         == 0][:, 6], 'ro', marker="o", label='backward magn')
         ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                        == 1][:, 4], 'bo', marker="x", label='forward real')
+                                                         == 1][:, 4], 'bo', marker="x", label='forward real')
         ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                        == 0][:, 4], 'ro', marker="x", label='backward real')
+                                                         == 0][:, 4], 'ro', marker="x", label='backward real')
         for i in range(0, len(dnpEnh[:, 0])):
             if dnpEnh[i, 7] == 1:
                 ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
-                            xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                            xytext=(dnpEnh[i, 1] + (max(dnpEnh[:, 1]) -
-                                                    min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
-                            va='center', ha='left', size=9, color='blue', alpha=0.6)
+                             xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
+                             xytext=(dnpEnh[i, 1] + (max(dnpEnh[:, 1]) -
+                                                     min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
+                             va='center', ha='left', size=9, color='blue', alpha=0.6)
             elif dnpEnh[i, 7] == 0:
                 ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
-                            xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                            xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) -
-                                                    min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
-                            va='center', ha='right', size=9, color='red', alpha=0.6)
+                             xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
+                             xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) -
+                                                     min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
+                             va='center', ha='right', size=9, color='red', alpha=0.6)
         try:
             ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--',
-                    label='(magn.) ' + enhancementFit['enhancementFormula'])
+                     label='(magn.) ' + enhancementFit['enhancementFormula'])
             ax6.plot(enhancementFit['xdata'], enhancementFit['ydataExp'], 'g--',
-                    label='(magn.) ' + enhancementFit['enhancementFormulaExp'])
+                     label='(magn.) ' + enhancementFit['enhancementFormulaExp'])
             ax6.annotate(enhancementFit['annotation'], xy=(
                 0.4, 0.5), xycoords='axes fraction', color='blue')
             ax6.annotate(enhancementFit['annotationExp'], xy=(
@@ -1203,12 +1215,13 @@ def make_figures(results, path='', **kwargs):
         ax6.set_title('Normalized DNP enhancement')
         ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
         ax6.legend(loc='upper right', fancybox=True,
-                shadow=True, fontsize='x-small')
+                   shadow=True, fontsize='x-small')
         fig6.tight_layout()
         [fig6.savefig(os.path.join(path, evalPath, ('normalized_ODNP_enhancement.' + x)), dpi=plotDpi)
-        for x in plotExts]
+         for x in plotExts]
         plt.close(fig6)
-        print("Enhancement figure saved in {}".format(os.path.join(path, evalPath)))
+        print("Enhancement figure saved in {}".format(
+            os.path.join(path, evalPath)))
     if t1SeriesEval:
         # Main T1 figure
         figure = plt.figure(figsize=figSize)
@@ -1311,10 +1324,14 @@ def make_figures(results, path='', **kwargs):
                 value.allFid[5][0]), 'r-', label='magn data', )
             plt.title('{:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
                 value.powerDbm, value.powerMw, value.ph))
-            integration = value.integrate(5,0,value.maxFreq - value.ftWindow,value.maxFreq + value.ftWindow,scale="Hz")
-            plt.plot(integration['x-axis'],integration['integralReal'], 'g--', label='real integral',)
-            plt.plot(integration['x-axis'],integration['integralImag'], 'y--', label='imag integral',)
-            plt.plot(integration['x-axis'],integration['integralMagn'], 'r--', label='magn integral',)
+            integration = value.integrate(
+                5, 0, value.maxFreq - value.ftWindow, value.maxFreq + value.ftWindow, scale="Hz")
+            plt.plot(
+                integration['x-axis'], integration['integralReal'], 'g--', label='real integral',)
+            plt.plot(
+                integration['x-axis'], integration['integralImag'], 'y--', label='imag integral',)
+            plt.plot(
+                integration['x-axis'], integration['integralMagn'], 'r--', label='magn integral',)
             plt.title('FT+integral, {:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
                 value.powerDbm, value.powerMw, value.ph))
             plt.xlabel('Frequency (Hz)')
@@ -1498,23 +1515,24 @@ def make_figures(results, path='', **kwargs):
             print("Plotting 3D views")
             fig13d = plt.figure(figsize=figSize)
             ax13d = fig13d.gca(projection='3d')
-            ax13d.set_title('NMR FIDs after baseline/offset correction (magn.)')
+            ax13d.set_title(
+                'NMR FIDs after baseline/offset correction (magn.)')
             ax13d.set_xlabel('time (ms)')
             ax13d.set_zlabel('Signal (a.u.)')
             ax13d.set_ylabel('Experiment index')
             # 3D plots for FIDs
             [ax13d.plot3D(value.fidTimeHistory['bZeroFilling'], np.abs(value.allFid[1][0]), value.expNum, zdir='y',
-                        zorder=int(-value.expNum), color=colors[i]) for i, value in
-            enumerate(x for x in results if x.expType == 'dnp')]
+                          zorder=int(-value.expNum), color=colors[i]) for i, value in
+             enumerate(x for x in results if x.expType == 'dnp')]
             xmin, xmax = min([min(a.fidTimeHistory['bZeroFilling']) for a in results if a.expType == 'dnp']), max(
                 [max(a.fidTimeHistory['bZeroFilling']) for a in results if a.expType == 'dnp'])
             zmin, zmax = min([min(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp']), max(
                 [max(np.abs(a.allFid[1][0])) for a in results if a.expType == 'dnp'])
             zs = [a.expNum for a in results if a.expType == 'dnp']
             labels = ['{:d} ({:.2f} W)'.format(int(a.expNum), a.powerMw / 1000)
-                    for a in results if a.expType == 'dnp']
+                      for a in results if a.expType == 'dnp']
             plt.yticks(zs, labels,
-                    rotation=270)
+                       rotation=270)
             for i, label in enumerate(ax13d.get_yticklabels()):
                 if label.get_text():
                     label.set_color(colors[i])
@@ -1526,7 +1544,7 @@ def make_figures(results, path='', **kwargs):
             ax13d.view_init(elev=17., azim=-23.)
             fig13d.tight_layout()
             [fig13d.savefig(os.path.join(path, evalPath, ('01_FIDs_raw_3D.' + x)), dpi=plotDpi)
-            for x in plotExts]
+             for x in plotExts]
             plt.close(fig13d)
             fig43d = plt.figure(figsize=figSize)
             ax43d = fig43d.gca(projection='3d')
@@ -1539,8 +1557,8 @@ def make_figures(results, path='', **kwargs):
             zmin, zmax = min([min(np.real(a.allFid[5][0])) for a in results if a.expType == 'dnp']), max(
                 [max(np.real(a.allFid[5][0])) for a in results if a.expType == 'dnp'])
             verts = [list(zip(a.frequency[np.logical_and(a.frequency > xmin, a.frequency < xmax)],
-                            np.real(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]))) for a in
-                    results if a.expType == 'dnp']
+                              np.real(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]))) for a in
+                     results if a.expType == 'dnp']
             poly = PolyCollection(verts, facecolors=colors)
             poly.set_alpha(0.6)
             plt.yticks(zs, labels, rotation=270)
@@ -1556,10 +1574,10 @@ def make_figures(results, path='', **kwargs):
             ax43d.view_init(elev=17., azim=-23.)
             ax43d.yaxis.labelpad = 45
             ax43d.legend(loc='upper right', fancybox=True,
-                        shadow=True, fontsize='x-small')
+                         shadow=True, fontsize='x-small')
             fig43d.tight_layout()
             [fig43d.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing_real_3d.' + x)), dpi=plotDpi)
-            for x in plotExts]
+             for x in plotExts]
             plt.close(fig43d)
             fig73d = plt.figure(figsize=figSize)
             ax73d = fig73d.gca(projection='3d')
@@ -1572,7 +1590,7 @@ def make_figures(results, path='', **kwargs):
                     a.real[1][0])))) for a in results if a.expType == 'dnp']
             zmin, zmax = min(
                 [min(np.abs(a.allFid[5][0]) * a.real[1][0] / np.abs(a.real[1][0])) for a in results if
-                a.expType == 'dnp']), max(
+                 a.expType == 'dnp']), max(
                 [max(np.abs(a.allFid[5][0]) * a.real[1][0] / np.abs(a.real[1][0])) for a in results if a.expType == 'dnp'])
             zs = [a.expNum for a in results if a.expType == 'dnp']
             poly = PolyCollection(verts, facecolors=colors)
@@ -1589,11 +1607,11 @@ def make_figures(results, path='', **kwargs):
             ax73d.view_init(elev=17., azim=-23.)
             ax73d.yaxis.labelpad = 45
             ax73d.legend(loc='upper right', fancybox=True,
-                        shadow=True, fontsize='x-small')
+                         shadow=True, fontsize='x-small')
             # fig73d.colorbar(test)
             fig73d.tight_layout()
             [fig73d.savefig(os.path.join(path, evalPath, ('06_FT_after_phasing_magn_3d.' + x)), dpi=plotDpi)
-            for x in plotExts]
+             for x in plotExts]
             plt.close(fig73d)
         except Exception as e:
             print('Error "{}" occured while making 3D plots'.format(e))
@@ -1699,20 +1717,23 @@ def fit_enhancement(power, enhancement):
     }
 
 
-def k_sigma_calc(power, enhancement, t1SeriesFunc, t1SeriesFit, spaceNo=500):
-    kSigmaUncor = [((1 - enhancement[i]) * .00152 / t1SeriesFunc(power[0]))
-                   for i in range(len(power))]
-    kSigmaCor = [((1 - enhancement[i]) * .00152 / t1SeriesFunc(power[i]))
-                 for i in range(len(power))]
+def k_sigma_calc(spaceNo=500):
+    kSigmaUncor = [((1 - kw['dnpEnh'][:, 6][i]) * .00152 / kw['t1FitSeries']['fit'](kw['dnpEnh'][:, 1][0]))
+                   for i in range(len(kw['dnpEnh'][:, 1]))]
+    kSigmaCor = [((1 - kw['dnpEnh'][:, 6][i]) * .00152 / kw['t1FitSeries']['fit'](kw['dnpEnh'][:, 1][i]))
+                 for i in range(len(kw['dnpEnh'][:, 1]))]
 
     def func(x, a, b):
         return a * x / (b + x)
 
-    poptCor, pcovCor = curve_fit(func, power, kSigmaCor, maxfev=10000)
-    poptUncor, pcovUncor = curve_fit(func, power, kSigmaUncor, maxfev=10000)
+    poptCor, pcovCor = curve_fit(
+        func, kw['dnpEnh'][:, 1], kSigmaCor, maxfev=10000)
+    poptUncor, pcovUncor = curve_fit(
+        func, kw['dnpEnh'][:, 1], kSigmaUncor, maxfev=10000)
     kSigmaSmaxCor = func(10e100, *poptCor)
     kSigmaSmaxUncor = func(10e100, *poptUncor)
-    xdata = np.linspace(min(power), max(power), spaceNo)
+    xdata = np.linspace(min(kw['dnpEnh'][:, 1]),
+                        max(kw['dnpEnh'][:, 1]), spaceNo)
     return {
         'kSigmaCor': kSigmaCor,
         'kSigmaUncor': kSigmaUncor,
@@ -1781,6 +1802,7 @@ def calculate_dnp_enh(results, phase):
             if dnpCounter == 0:
                 normReal = result.real[1][0]
                 normMagn = result.magn[1][0]
+            # Work-around for phasing problem
             if phase == 'all' and result.powerMw > enhMinPower:
                 dnpEnhLine = [result.expNum, result.powerMw, result.powerDbm, -result.real[1][0],
                               -result.real[1][0] / normReal, -result.magn[1][0], -result.magn[1][0] / normMagn]
@@ -1822,5 +1844,14 @@ def calculate_t1_series(results):
                              result.t1fit['t1'],
                              result.t1fit['t1error']])
             t1Counter += 1
+    t1Series = np.asarray(t1Series)
+    t1SeriesPolDeg = kw.get('t1SeriesPolDeg', 1)
+    try:
+        t1FitSeries = fit_t1_series(
+            t1Series[:, 1], t1Series[:, 3], t1Series[:, 4], degree=t1SeriesPolDeg)
+    except Exception as e:
+        print("Error {} happened when fitting T1 series".format(e))
+        t1FitSeries = False
     kw['t1Series'] = t1Series
+    kw['t1FitSeries'] = t1FitSeries
     return True
