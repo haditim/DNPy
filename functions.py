@@ -8,6 +8,9 @@ import time
 
 import numpy as np
 import scipy as sp
+import matplotlib
+# to prevent Tcl_AsyncDelete: async handler deleted by the wrong thread
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from scipy import fft
 from scipy.fftpack import fftshift
@@ -19,7 +22,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.collections import PolyCollection, LineCollection
 from matplotlib import cm
 import scipy.io as sio
-
 style.use('seaborn-whitegrid')
 
 
@@ -235,6 +237,7 @@ class NMRData(object):
                     pass
             self.dwellTime = dwellTime
             self.expNum = os.path.basename(directory)
+            self.directory = directory
         self.calculate_phase_cycles()
         # self.calculate_exp_integral
         # HADI: I want to keep track of time after processing
@@ -385,7 +388,7 @@ class NMRData(object):
                 fid * phaseFactor for fid in self.allFid[fromPos]]
         else:
             applyIndex = [applyIndex] if not type(
-                applyIndex) == 'list' else applyIndex
+                applyIndex).__name__ == 'list' else applyIndex
             for i in applyIndex:
                 self.allFid[toPos][i] = self.allFid[fromPos][i] * phaseFactor
 
@@ -1054,8 +1057,6 @@ def return_exps(path, **kwargs):
     results = [result for result in results if not result == None]
     print('{} experiments were added in {:.2} seconds'.format(
         len(results), end-start))
-    if kw['process']:
-        process_exps(results, path)
     return results
 
 
@@ -1099,10 +1100,229 @@ def process_exps(results, path):
     print('All done')
     return results
 
+def plot_exps_worker(result):
+    try:
+        if result.expType == 'dnp':  # FID plots
+            print('Plotting exp {} figures (DNP)'.format(str(int(result.expNum))))
+            figure = plt.figure(figsize=kw['figSize'])
+            plt.plot(result.fidTimeHistory['bLeftShift'], np.real(result.allFid[0][0]), label='real')
+            plt.plot(result.fidTimeHistory['bLeftShift'], np.imag(result.allFid[0][0]), label='imag')
+            plt.title('FID at {:+.1f} dBm and {:.2f} mW power'.format(result.powerDbm, result.powerMw))
+            plt.xlabel('time (ms)')
+            plt.ylabel('Signal (a.u.)')
+            plt.tight_layout()
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('FID.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            print('plot saved at ', os.path.join(result.directory, ('FID')))
+            plt.close(figure)
+            kw['dnp_raw_fid_ax'].plot(result.fidTimeHistory['bLeftShift'], np.real(result.allFid[0][0]), label=(
+                '{:+.1f} dBm\t{:.2f} mW power'.format(result.powerDbm, result.powerMw)).expandtabs())  # original
+            kw['dnp_corrected_ax'].plot(result.fidTimeHistory['bZeroFilling'], np.real(result.allFid[1][0]), label=(
+                '{:+.1f} dBm\t{:.2f} mW power'.format(result.powerDbm,
+                                                        result.powerMw)).expandtabs())  # after left and right shift and baselineCorrection
+            kw['dnp_zero_filled_ax'].plot(result.fidTime, np.real(result.allFid[2][0]), label=(
+                '{:+.1f} dBm\t{:.2f} mW power'.format(result.powerDbm,
+                                                        result.powerMw)).expandtabs())  # after zero filling
+            kw['dnp_exp_win_ax'].plot(result.fidTime, np.real(result.allFid[3][0]), label=(
+                '{:+.1f} dBm\t{:.2f} mW power'.format(result.powerDbm,
+                                                        result.powerMw)).expandtabs())  # after exponential windowing
+            # FT plots
+            figure = plt.figure(figsize=kw['figSize'])
+            plt.plot(result.frequency, np.real(
+                result.allFid[5][0]), label='real')
+            plt.plot(result.frequency, np.imag(
+                result.allFid[5][0]), label='imag.')
+            plt.plot(result.frequency, np.abs(
+                result.allFid[5][0]), label='abs.')
+            plt.title('{:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
+                result.powerDbm, result.powerMw, result.ph))
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.xlim(result.maxFreq - result.ftWindow,
+                        result.maxFreq + result.ftWindow)
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('FT.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            plt.close(figure)
+            # FT integral plots
+            figure = plt.figure(figsize=kw['figSize'])
+            plt.plot(result.frequency, np.real(
+                result.allFid[5][0]), 'g-', label='real data', )
+            plt.plot(result.frequency, np.imag(
+                result.allFid[5][0]), 'y-', label='imag data', )
+            plt.plot(result.frequency, np.abs(
+                result.allFid[5][0]), 'r-', label='magn data', )
+            plt.title('{:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
+                result.powerDbm, result.powerMw, result.ph))
+            integration = result.integrate(
+                5, 0, result.maxFreq - result.ftWindow, result.maxFreq + result.ftWindow, scale="Hz")
+            plt.plot(
+                integration['x-axis'], integration['integralReal'], 'g--', label='real integral',)
+            plt.plot(
+                integration['x-axis'], integration['integralImag'], 'y--', label='imag integral',)
+            plt.plot(
+                integration['x-axis'], integration['integralMagn'], 'r--', label='magn integral',)
+            plt.title('FT+integral, {:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
+                result.powerDbm, result.powerMw, result.ph))
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.xlim(result.maxFreq - result.ftWindow,
+                        result.maxFreq + result.ftWindow)
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('FT_integral.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            plt.close(figure)
+            kw['dnp_ft_real_ax'].plot(result.frequency, np.real(result.allFid[5][0]), label=(
+                '{:.1f} dBm\t{:.2f} mW power'.format(result.powerDbm, result.powerMw)).expandtabs())
+            kw['dnp_ft_real_ax'].set_title('FT after phasing to %.0f degrees' % result.ph)
+            kw['dnp_ft_real_ax'].grid(True)
+            kw['dnp_ft_real_ax'].set_xlim(result.maxFreq - result.ftWindow,
+                            result.maxFreq + result.ftWindow)
+            kw['dnp_ft_magn_ax'].plot(result.frequency, np.abs(result.allFid[5][0]) * result.real[1][0] / np.abs(result.real[1][0]), label=(
+                '{:.1f} dBm\t{:.2f} mW power'.format(result.powerDbm, result.powerMw)).expandtabs())
+            kw['dnp_ft_magn_ax'].set_title('FT after phasing to %.0f degrees' % result.ph)
+            kw['dnp_ft_magn_ax'].grid(True)
+            kw['dnp_ft_magn_ax'].set_xlim(result.maxFreq - result.ftWindow,
+                            result.maxFreq + result.ftWindow)
+            # Data for DNP figs
+            # centerFreq.append([((result.expTime-expStart)/60.),
+            #                    result.expCenterFreq, result.expNum, result.powerMw])
+        elif result.expType == 't1' and kw['t1SeriesEval']:
+            print('Plotting exp {} figures (T1)'.format(str(int(result.expNum))))
+            figure = plt.figure(figsize=kw['figSize'])
+            plt.errorbar(result.fitData[0], result.fitData[1],
+                            yerr=(result.fitData[1] - result.t1fit['evalY']),
+                            fmt='+',
+                            label='data: '+str(kw['t1Calc']), capthick=2, capsize=2)
+            plt.plot(result.t1fit['xdata'], result.t1fit['ydata'],
+                        label=result.t1fit['t1FitFormula'])
+            plt.annotate(r'$T_1={{{:.4f}}}\pm{{{:.4f}}}$'.format(
+                result.t1fit['t1'], result.t1fit['t1error']), xy=(0.4, 0.5), xycoords='axes fraction')
+            plt.title('$T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
+                result.powerMw, result.ph))
+            plt.xlabel('Time (s)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('T1.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            plt.close(figure)
+            # Real part figure
+            figure = plt.figure(figsize=kw['figSize'])
+            for j in range(1, len(result.real)):
+                plt.plot(result.real[0], result.real[j], label='PC' + str(j))
+            plt.title('Real integral of phase cycle channels of $T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
+                result.powerMw, result.ph))
+            plt.plot(result.phC[0], result.phC[1], '--',
+                        label='PhaseCycled (sum after individual phasing)')
+            plt.xlabel('Time (s)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('T1_PC_real.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            plt.close(figure)
+            # Magnitude part figure
+            figure = plt.figure(figsize=kw['figSize'])
+            for j in range(1, len(result.magn)):
+                plt.plot(result.magn[0], result.magn[j], label='PC' + str(j))
+            plt.title('Magnitude integral of phase cycle channels of $T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
+                result.powerMw, result.ph))
+            plt.plot(result.phC[0], result.phC[2], '--',
+                        label='PhaseCycled (sum after individual phasing)')
+            plt.xlabel('Time (s)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('T1_PC_magn.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            plt.close(figure)
+            # Figure for fourier transforms
+            figure = plt.figure(figsize=kw['figSize'])
+            for j, time in enumerate(result.allFid[5]):
+                if j % (result.phaseCycles) == 0:  # only first scan
+                    plt.plot(result.frequency, np.real(result.allFid[5][j]),
+                                label=('{:.2f}s'.format(result.vdList[int(j / result.phaseCycles)])))
+            plt.title('FT (real) at {:.2f} mW power, {}$^\circ$ phase'.format(
+                result.powerMw, result.ph))
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.xlim(result.maxFreq - result.ftWindow,
+                        result.maxFreq + result.ftWindow)
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('FT.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            plt.close(figure)
+            # Figure for FIDs
+            # real
+            figure = plt.figure(figsize=kw['figSize'])
+            for j, time in enumerate(result.allFid[5]):
+                if j % (result.phaseCycles) == 0:  # only first scan
+                    plt.plot(result.fidTime, np.real(result.allFid[2][j]),
+                                label='{:.2f}s'.format(result.vdList[int(j / result.phaseCycles)]))
+            plt.title('$T_1$ FIDs at {:.2f} mW power, {}$^\circ$ phase'.format(
+                result.powerMw, result.ph))
+            plt.xlabel('Time (s)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.xlim(0, max(result.fidTime) / 3.)
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('FID_corrected.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            plt.close(figure)
+            # After exponential windowing
+            figure = plt.figure(figsize=kw['figSize'])
+            for j, time in enumerate(result.allFid[5]):
+                if j % (result.phaseCycles) == 0:  # only first scan
+                    plt.plot(result.fidTime, np.real(result.allFid[3][j]),
+                                label='{:.2f}s'.format(result.vdList[int(j / result.phaseCycles)]))
+            plt.title('$T_1$ FIDs at {:.2f} mW power, {}$^\circ$ phase'.format(
+                result.powerMw, result.ph))
+            plt.xlabel('Time (s)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.xlim(0, max(result.fidTime))
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('FID_after_windowing.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            plt.close(figure)
+
+            figure = plt.figure(figsize=kw['figSize'])
+            # after corrections
+            for j, time in enumerate(result.allFid[5]):
+                if j % (result.phaseCycles) == 0:  # only first scan
+                    plt.plot(result.fidTimeHistory['bLeftShift'], np.real(result.allFid[0][j]),
+                                label='{:.2f}s'.format(result.vdList[int(j / result.phaseCycles)]))
+            plt.title('$T_1$ FIDs at {:.2f} mW power, {}$^\circ$ phase'.format(
+                result.powerMw, result.ph))
+            plt.xlabel('Time (s)')
+            plt.ylabel('Intensity (a.u.)')
+            plt.tight_layout()
+            plt.legend(loc='best', fancybox=True,
+                        shadow=True, fontsize='x-small')
+            [plt.savefig(os.path.join(result.directory, ('FID_raw.' + x)), dpi=kw['plotDpi'])
+                for x in kw['plotExts']]
+            plt.close(figure)
+        return result.expNum
+    except Exception as e:
+        return e
+
 
 def dumpAllToCSV(results, path):
     # dnpEnh: expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
-    print(kw['dnpEnh'])
     np.savetxt(os.path.join(path, kw['evalPath'], 'enhancements.csv'), kw['dnpEnh'], delimiter='\t', fmt='%s',
                header=('expNum\tpowerMw\tpowerDbm\tintReal\tnormIntReal\tintMagn\tnormIntMagn\tforward'))
     # t1Series: expNum, powerMw, powerDbm, t1, t1error
@@ -1115,414 +1335,224 @@ def dumpAllToCSV(results, path):
                            (kw['dnpEnh'][:, 1], kw['kSigmaFit']['kSigmaCor'], kw['kSigmaFit']['kSigmaUncor'])).transpose(),
                        delimiter='\t', fmt='%s', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
 
-
-def make_figures(results, path='', **kwargs):
-    """ Makes figures for ODNP experiment """
-    dnpEnh = kwargs.get('dnpEnh', [])
-    t1Series = kwargs.get('t1Series', [])
-    t1Calc = kwargs.get('t1Calc', '')
-    enhancementFit = kwargs.get('enhancementFit', {})
-    t1FitSeries = kwargs.get('t1FitSeries', {})
-    kSigmaFit = kwargs.get('kSigmaFit', {})
-    ftWindow = kwargs.get('ftWindow', 200)
-    evalPath = kwargs.get('evalPath', 'eval')
-    plotDpi = kwargs.get('plotDpi', 250)
-    make3dPlots = kwargs.get('make3dPlots', True)
-    figSize = kwargs.get('figSize', (12, 8))
-    plotExts = kwargs.get('plotExts', ['jpg'])
-    t1SeriesEval = kwargs.get('t1SeriesEval', True)
-    kSigmaCalc = kwargs.get('kSigmaCalc', True)
-    enhCalc = kwargs.get('enhCalc', True)
+def make_figs_axes():
+    """Initializes figures for DNP and T1 experiments"""
     # Initializing figures
-    fig0 = plt.figure(figsize=figSize)
-    ax0 = fig0.add_subplot(111)
-    ax0.set_title('Raw NMR FIDs (real)')
-    ax0.set_xlabel('time (ms)')
-    ax0.set_ylabel('Signal (a.u.)')
-    fig1 = plt.figure(figsize=figSize)
-    ax1 = fig1.add_subplot(111)
-    ax1.set_title(
+    # Raw FIDs
+    kw['dnp_raw_fid'] = plt.figure(figsize=kw['figSize'])
+    kw['dnp_raw_fid_ax'] = kw['dnp_raw_fid'].add_subplot(111)
+    kw['dnp_raw_fid_ax'].set_title('Raw NMR FIDs (real)')
+    kw['dnp_raw_fid_ax'].set_xlabel('time (ms)')
+    kw['dnp_raw_fid_ax'].set_ylabel('Signal (a.u.)')
+    # After digital filter and offset/baseline correction
+    kw['dnp_corrected'] = plt.figure(figsize=kw['figSize'])
+    kw['dnp_corrected_ax'] = kw['dnp_corrected'].add_subplot(111)
+    kw['dnp_corrected_ax'].set_title(
         'NMR FIDs after digital filter removal and offset/baseline correction (real)')
-    ax1.set_xlabel('time (ms)')
-    ax1.set_ylabel('Signal (a.u.)')
-    fig2 = plt.figure(figsize=figSize)
-    ax2 = fig2.add_subplot(111)
-    ax2.set_title('NMR FIDs with zero filling (real)')
-    ax2.set_xlabel('time (ms)')
-    ax2.set_ylabel('Signal (a.u.)')
-    fig3 = plt.figure(figsize=figSize)
-    ax3 = fig3.add_subplot(111)
-    ax3.set_title('NMR FIDs after exponential windowing (real)')
-    ax3.set_xlabel('time (ms)')
-    ax3.set_ylabel('Signal (a.u.)')
-    fig4 = plt.figure(figsize=figSize)
-    ax4 = fig4.add_subplot(111)
-    ax4.legend(loc='upper right', fancybox=True,
+    kw['dnp_corrected_ax'].set_xlabel('time (ms)')
+    kw['dnp_corrected_ax'].set_ylabel('Signal (a.u.)')
+    # With zero filling
+    kw['dnp_zero_filled'] = plt.figure(figsize=kw['figSize'])
+    kw['dnp_zero_filled_ax'] = kw['dnp_zero_filled'].add_subplot(111)
+    kw['dnp_zero_filled_ax'].set_title('NMR FIDs with zero filling (real)')
+    kw['dnp_zero_filled_ax'].set_xlabel('time (ms)')
+    kw['dnp_zero_filled_ax'].set_ylabel('Signal (a.u.)')
+    # After exponential windowing
+    kw['dnp_exp_win'] = plt.figure(figsize=kw['figSize'])
+    kw['dnp_exp_win_ax'] = kw['dnp_exp_win'].add_subplot(111)
+    kw['dnp_exp_win_ax'].set_title('NMR FIDs after exponential windowing (real)')
+    kw['dnp_exp_win_ax'].set_xlabel('time (ms)')
+    kw['dnp_exp_win_ax'].set_ylabel('Signal (a.u.)')
+    # FT real
+    kw['dnp_ft_real'] = plt.figure(figsize=kw['figSize'])
+    kw['dnp_ft_real_ax'] = kw['dnp_ft_real'].add_subplot(111)
+    kw['dnp_ft_real_ax'].legend(loc='upper right', fancybox=True,
                shadow=True, fontsize='x-small')
-    ax4.set_xlabel('Frequency offset (Hz)')
-    ax4.set_ylabel('Intensity (a.u.)')
-    fig7 = plt.figure(figsize=figSize)
-    ax7 = fig7.add_subplot(111)
-    ax7.legend(loc='upper right', fancybox=True,
+    kw['dnp_ft_real_ax'].set_xlabel('Frequency offset (Hz)')
+    kw['dnp_ft_real_ax'].set_ylabel('Intensity (a.u.)')
+    # FT magnitude
+    kw['dnp_ft_magn'] = plt.figure(figsize=kw['figSize'])
+    kw['dnp_ft_magn_ax'] = kw['dnp_ft_magn'].add_subplot(111)
+    kw['dnp_ft_magn_ax'].legend(loc='upper right', fancybox=True,
                shadow=True, fontsize='x-small')
-    ax7.set_xlabel('Frequency offset (Hz)')
-    ax7.set_ylabel('Intensity (a.u.)')
-    fig5 = plt.figure(figsize=figSize)  # time vs centerFreq
-    ax5 = fig5.add_subplot(111)
-    ax5.set_xlabel('time (mim)')
-    ax5.set_ylabel('Center FT frequency (Hz)')
-    fig6 = plt.figure(figsize=figSize)  # DNP enhancement
-    ax6 = fig6.add_subplot(111)
-    ax6.set_xlabel('Power (mW)')
-    ax6.set_ylabel('FT Integral, normalized to MW off')
-    if enhCalc:
+    kw['dnp_ft_magn_ax'].set_xlabel('Frequency offset (Hz)')
+    kw['dnp_ft_magn_ax'].set_ylabel('Intensity (a.u.)')
+    # Time vs centerFreq
+    kw['time_center_freq'] = plt.figure(figsize=kw['figSize'])  
+    kw['time_center_freq_ax'] = kw['time_center_freq'].add_subplot(111)
+    kw['time_center_freq_ax'].set_xlabel('time (mim)')
+    kw['time_center_freq_ax'].set_ylabel('Center FT frequency (Hz)')
+    # DNP enhancement
+    kw['dnp_enhancement'] = plt.figure(figsize=kw['figSize'])  # DNP enhancement
+    kw['dnp_enhancement_ax'] = kw['dnp_enhancement'].add_subplot(111)
+    kw['dnp_enhancement_ax'].set_xlabel('Power (mW)')
+    kw['dnp_enhancement_ax'].set_ylabel('FT Integral, normalized to MW off')
+    # 3D figures
+    if kw['make3dPlots']:
+        kw['dnp_corrected_3d'] = plt.figure(figsize=kw['figSize'])
+        kw['dnp_corrected_3d_ax'] = kw['dnp_corrected_3d'].gca(projection='3d')
+        kw['dnp_corrected_3d_ax'].set_title(
+            'NMR FIDs after baseline/offset correction (magn.)')
+        kw['dnp_corrected_3d_ax'].set_xlabel('time (ms)')
+        kw['dnp_corrected_3d_ax'].set_zlabel('Signal (a.u.)')
+        kw['dnp_corrected_3d_ax'].set_ylabel('Experiment index')
+        kw['dnp_corrected_3d_ax'].grid(True)
+        kw['dnp_ft_real_3d'] = plt.figure(figsize=kw['figSize'])
+        kw['dnp_ft_real_3d_ax'] = kw['dnp_ft_real_3d'].gca(projection='3d')
+        kw['dnp_ft_real_3d_ax'].set_title('NMR FTs after exponential windowing (real)')
+        kw['dnp_ft_real_3d_ax'].set_xlabel('Frequency offset (Hz)')
+        kw['dnp_ft_real_3d_ax'].set_zlabel('Intensity (a.u.)')
+        kw['dnp_ft_real_3d_ax'].set_ylabel('Experiment index')
+        kw['dnp_ft_real_3d_ax'].grid(True)
+        kw['dnp_ft_magn_3d'] = plt.figure(figsize=kw['figSize'])
+        kw['dnp_ft_magn_3d_ax'] = kw['dnp_ft_magn_3d'].gca(projection='3d')
+        kw['dnp_ft_magn_3d_ax'].set_title('NMR FTs after exponential windowing (magnitude)')
+        kw['dnp_ft_magn_3d_ax'].set_xlabel('Frequency offset (Hz)')
+        kw['dnp_ft_magn_3d_ax'].set_zlabel('Intensity (a.u.)')
+        kw['dnp_ft_magn_3d_ax'].set_ylabel('Experiment index')
+        kw['dnp_ft_magn_3d_ax'].grid(True)
+
+
+def make_figures(results, path=''):
+    """ Makes figures for ODNP experiment """
+    make_figs_axes()
+    if kw['enhCalc']:
         # Generating figures for dnp folders and collection of data
         powers = [x.powerMw for x in results if x.expType == 'dnp']
         inter = interp1d([min(powers), max(powers)], [0, 1])
         colors = [cm.jet(inter(x)) for x in powers]
         # DNP enhancement
-        ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                         == 1][:, 6], 'bo', marker="o", label='forward magn.')
-        ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                         == 0][:, 6], 'ro', marker="o", label='backward magn')
-        ax6.plot(dnpEnh[dnpEnh[:, 7] == 1][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                         == 1][:, 4], 'bo', marker="x", label='forward real')
-        ax6.plot(dnpEnh[dnpEnh[:, 7] == 0][:, 1], dnpEnh[dnpEnh[:, 7]
-                                                         == 0][:, 4], 'ro', marker="x", label='backward real')
-        for i in range(0, len(dnpEnh[:, 0])):
-            if dnpEnh[i, 7] == 1:
-                ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
-                             xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                             xytext=(dnpEnh[i, 1] + (max(dnpEnh[:, 1]) -
-                                                     min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
+        kw['dnp_enhancement_ax'].plot(
+            kw['dnpEnh'][kw['dnpEnh'][:, 7] == 1][:, 1], kw['dnpEnh'][kw['dnpEnh'][:, 7] == 1][:, 6], 'bo', marker="o", label='forward magn.')
+        kw['dnp_enhancement_ax'].plot(
+            kw['dnpEnh'][kw['dnpEnh'][:, 7] == 0][:, 1], kw['dnpEnh'][kw['dnpEnh'][:, 7] == 0][:, 6], 'ro', marker="o", label='backward magn')
+        kw['dnp_enhancement_ax'].plot(
+            kw['dnpEnh'][kw['dnpEnh'][:, 7] == 1][:, 1], kw['dnpEnh'][kw['dnpEnh'][:, 7] == 1][:, 4], 'bo', marker="x", label='forward real')
+        kw['dnp_enhancement_ax'].plot(
+            kw['dnpEnh'][kw['dnpEnh'][:, 7] == 0][:, 1], kw['dnpEnh'][kw['dnpEnh'][:, 7] == 0][:, 4], 'ro', marker="x", label='backward real')
+        for i in range(0, len(kw['dnpEnh'][:, 0])):
+            if kw['dnpEnh'][i, 7] == 1:
+                kw['dnp_enhancement_ax'].annotate('exp {:d}'.format(int(float(kw['dnpEnh'][i, 0]))),
+                             xy=(kw['dnpEnh'][i, 1], kw['dnpEnh'][i, 6]),
+                             xytext=(kw['dnpEnh'][i, 1] + (max(kw['dnpEnh'][:, 1]) -
+                                                     min(kw['dnpEnh'][:, 1])) / 40, kw['dnpEnh'][i, 6]),
                              va='center', ha='left', size=9, color='blue', alpha=0.6)
-            elif dnpEnh[i, 7] == 0:
-                ax6.annotate('exp {:d}'.format(int(float(dnpEnh[i, 0]))),
-                             xy=(dnpEnh[i, 1], dnpEnh[i, 6]),
-                             xytext=(dnpEnh[i, 1] - (max(dnpEnh[:, 1]) -
-                                                     min(dnpEnh[:, 1])) / 40, dnpEnh[i, 6]),
+            elif kw['dnpEnh'][i, 7] == 0:
+                kw['dnp_enhancement_ax'].annotate('exp {:d}'.format(int(float(kw['dnpEnh'][i, 0]))),
+                             xy=(kw['dnpEnh'][i, 1], kw['dnpEnh'][i, 6]),
+                             xytext=(kw['dnpEnh'][i, 1] - (max(kw['dnpEnh'][:, 1]) -
+                                                     min(kw['dnpEnh'][:, 1])) / 40, kw['dnpEnh'][i, 6]),
                              va='center', ha='right', size=9, color='red', alpha=0.6)
         try:
-            ax6.plot(enhancementFit['xdata'], enhancementFit['ydata'], 'b--',
-                     label='(magn.) ' + enhancementFit['enhancementFormula'])
-            ax6.plot(enhancementFit['xdata'], enhancementFit['ydataExp'], 'g--',
-                     label='(magn.) ' + enhancementFit['enhancementFormulaExp'])
-            ax6.annotate(enhancementFit['annotation'], xy=(
+            kw['dnp_enhancement_ax'].plot(kw['enhancementFit']['xdata'], kw['enhancementFit']['ydata'], 'b--',
+                     label='(magn.) ' + kw['enhancementFit']['enhancementFormula'])
+            kw['dnp_enhancement_ax'].plot(kw['enhancementFit']['xdata'], kw['enhancementFit']['ydataExp'], 'g--',
+                     label='(magn.) ' + kw['enhancementFit']['enhancementFormulaExp'])
+            kw['dnp_enhancement_ax'].annotate(kw['enhancementFit']['annotation'], xy=(
                 0.4, 0.5), xycoords='axes fraction', color='blue')
-            ax6.annotate(enhancementFit['annotationExp'], xy=(
+            kw['dnp_enhancement_ax'].annotate(kw['enhancementFit']['annotationExp'], xy=(
                 0.55, 0.5), xycoords='axes fraction', color='green')
         except:
             pass
-        ax6.set_title('Normalized DNP enhancement')
-        ax6.legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
-        ax6.legend(loc='upper right', fancybox=True,
+        kw['dnp_enhancement_ax'].set_title('Normalized DNP enhancement')
+        kw['dnp_enhancement_ax'].legend(loc='best', fancybox=True, shadow=True, fontsize='x-small')
+        kw['dnp_enhancement_ax'].legend(loc='upper right', fancybox=True,
                    shadow=True, fontsize='x-small')
-        fig6.tight_layout()
-        [fig6.savefig(os.path.join(path, evalPath, ('normalized_ODNP_enhancement.' + x)), dpi=plotDpi)
-         for x in plotExts]
-        plt.close(fig6)
+        kw['dnp_enhancement'].tight_layout()
+        [kw['dnp_enhancement'].savefig(os.path.join(path, kw['evalPath'], ('normalized_ODNP_enhancement.' + x)), dpi=kw['plotDpi'])
+         for x in kw['plotExts']]
+        plt.close(kw['dnp_enhancement'])
         print("Enhancement figure saved in {}".format(
-            os.path.join(path, evalPath)))
-    if t1SeriesEval:
+            os.path.join(path, kw['evalPath'])))
+    if kw['t1SeriesEval']:
         # Main T1 figure
-        figure = plt.figure(figsize=figSize)
+        figure = plt.figure(figsize=kw['figSize'])
         # Generated linear fit
-        plt.errorbar(t1Series[:, 1], t1Series[:, 3], yerr=t1Series[:, 4],
+        plt.errorbar(kw['t1Series'][:, 1], kw['t1Series'][:, 3], yerr=kw['t1Series'][:, 4],
                      fmt='+', capthick=2, capsize=2, label=r'$T_1$ experiments')
-        plt.plot(t1FitSeries['xdata'], t1FitSeries['ydata'], '--k',
-                 label=t1FitSeries['fitFormula'])
-        for i in range(0, len(t1Series[:, 0])):
-            plt.annotate('exp {:d}'.format(int(t1Series[i, 0])),
-                         xy=(t1Series[i, 1], t1Series[i, 3]),
-                         xytext=(t1Series[i, 1] + (max(t1Series[:, 1]) -
-                                                   min(t1Series[:, 1])) / 40, t1Series[i, 3]),
+        plt.plot(kw['t1FitSeries']['xdata'], kw['t1FitSeries']['ydata'], '--k',
+                 label=kw['t1FitSeries']['fitFormula'])
+        for i in range(0, len(kw['t1Series'][:, 0])):
+            plt.annotate('exp {:d}'.format(int(kw['t1Series'][i, 0])),
+                         xy=(kw['t1Series'][i, 1], kw['t1Series'][i, 3]),
+                         xytext=(kw['t1Series'][i, 1] + (max(kw['t1Series'][:, 1]) -
+                                                   min(kw['t1Series'][:, 1])) / 40, kw['t1Series'][i, 3]),
                          va='center', ha='left', size=9, color='blue', alpha=0.6)
         plt.xlabel('Power (mW)')
         plt.ylabel('Time (s)')
         plt.title(r'$T_1$ series')
         plt.legend()
         figure.tight_layout()
-        [plt.savefig(os.path.join(path, evalPath, ('T1_time_series.' + x)), dpi=plotDpi)
-         for x in plotExts]
+        [plt.savefig(os.path.join(path, kw['evalPath'], ('T1_time_series.' + x)), dpi=kw['plotDpi'])
+         for x in kw['plotExts']]
         plt.close(figure)
-        print("T1 figure saved in {}".format(os.path.join(path, evalPath)))
-        if kSigmaCalc:
+        print("T1 figure saved in {}".format(os.path.join(path, kw['evalPath'])))
+        if kw['kSigmaCalc']:
             # kSigma figure
-            figure = plt.figure(figsize=figSize)
-            plt.plot(dnpEnh[:, 1], kSigmaFit['kSigmaCor'],
+            figure = plt.figure(figsize=kw['figSize'])
+            plt.plot(kw['dnpEnh'][:, 1], kw['kSigmaFit']['kSigmaCor'],
                      'o', c='green', label='cor')
-            plt.plot(dnpEnh[:, 1], kSigmaFit['kSigmaUncor'],
+            plt.plot(kw['dnpEnh'][:, 1], kw['kSigmaFit']['kSigmaUncor'],
                      'o', c='red', label='uncor')
-            plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataCor'],
-                     '--', c='green', label=kSigmaFit['corFormula'])
-            plt.plot(kSigmaFit['xdata'], kSigmaFit['ydataUncor'],
-                     '--', c='red', label=kSigmaFit['uncorFormula'])
+            plt.plot(kw['kSigmaFit']['xdata'], kw['kSigmaFit']['ydataCor'],
+                     '--', c='green', label=kw['kSigmaFit']['corFormula'])
+            plt.plot(kw['kSigmaFit']['xdata'], kw['kSigmaFit']['ydataUncor'],
+                     '--', c='red', label=kw['kSigmaFit']['uncorFormula'])
             plt.xlabel('Power (mW)')
             plt.ylabel(r'$k_{\sigma}s(P)C$  $(\frac{1}{s})$')
             plt.title(r'$k_{\sigma}$ calculations')
             plt.legend()
             figure.tight_layout()
-            [plt.savefig(os.path.join(path, evalPath, ('kSigma.' + x)), dpi=plotDpi)
-             for x in plotExts]
+            [plt.savefig(os.path.join(path, kw['evalPath'], ('kSigma.' + x)), dpi=kw['plotDpi'])
+             for x in kw['plotExts']]
             plt.close(figure)
             print("kSigma figure saved in {}".format(
-                os.path.join(path, evalPath)))
-    for i, value in enumerate(results):
-        if value.expType == 'dnp':  # FID plots
-            print('Plotting exp {} figures (DNP)'.format(str(int(value.expNum))))
-            figure = plt.figure(figsize=figSize)
-            plt.plot(value.fidTimeHistory['bLeftShift'], np.real(
-                value.allFid[0][0]), label='real')
-            plt.plot(value.fidTimeHistory['bLeftShift'], np.imag(
-                value.allFid[0][0]), label='imag')
-            plt.title(
-                'FID at {:+.1f} dBm and {:.2f} mW power'.format(value.powerDbm, value.powerMw))
-            plt.xlabel('time (ms)')
-            plt.ylabel('Signal (a.u.)')
-            plt.tight_layout()
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(figure)
-            ax0.plot(value.fidTimeHistory['bLeftShift'], np.real(value.allFid[0][0]), label=(
-                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())  # original
-            ax1.plot(value.fidTimeHistory['bZeroFilling'], np.real(value.allFid[1][0]), label=(
-                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm,
-                                                      value.powerMw)).expandtabs())  # after left and right shift and baselineCorrection
-            ax2.plot(value.fidTime, np.real(value.allFid[2][0]), label=(
-                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm,
-                                                      value.powerMw)).expandtabs())  # after zero filling
-            ax3.plot(value.fidTime, np.real(value.allFid[3][0]), label=(
-                '{:+.1f} dBm\t{:.2f} mW power'.format(value.powerDbm,
-                                                      value.powerMw)).expandtabs())  # after exponential windowing
-            # FT plots
-            figure = plt.figure(figsize=figSize)
-            plt.plot(value.frequency, np.real(
-                value.allFid[5][0]), label='real')
-            plt.plot(value.frequency, np.imag(
-                value.allFid[5][0]), label='imag.')
-            plt.plot(value.frequency, np.abs(
-                value.allFid[5][0]), label='abs.')
-            plt.title('{:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
-                value.powerDbm, value.powerMw, value.ph))
-            plt.xlabel('Frequency (Hz)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.tight_layout()
-            plt.xlim(value.maxFreq - value.ftWindow,
-                     value.maxFreq + value.ftWindow)
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            # FT integral plots
-            figure = plt.figure(figsize=figSize)
-            plt.plot(value.frequency, np.real(
-                value.allFid[5][0]), 'g-', label='real data', )
-            plt.plot(value.frequency, np.imag(
-                value.allFid[5][0]), 'y-', label='imag data', )
-            plt.plot(value.frequency, np.abs(
-                value.allFid[5][0]), 'r-', label='magn data', )
-            plt.title('{:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
-                value.powerDbm, value.powerMw, value.ph))
-            integration = value.integrate(
-                5, 0, value.maxFreq - value.ftWindow, value.maxFreq + value.ftWindow, scale="Hz")
-            plt.plot(
-                integration['x-axis'], integration['integralReal'], 'g--', label='real integral',)
-            plt.plot(
-                integration['x-axis'], integration['integralImag'], 'y--', label='imag integral',)
-            plt.plot(
-                integration['x-axis'], integration['integralMagn'], 'r--', label='magn integral',)
-            plt.title('FT+integral, {:+.1f} dBm, {:.2f} mW power and {}$^\circ$ phase'.format(
-                value.powerDbm, value.powerMw, value.ph))
-            plt.xlabel('Frequency (Hz)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.tight_layout()
-            plt.xlim(value.maxFreq - value.ftWindow,
-                     value.maxFreq + value.ftWindow)
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT_integral.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(figure)
-            ax4.plot(value.frequency, np.real(value.allFid[5][0]), label=(
-                '{:.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())
-            ax4.set_title('FT after phasing to %.0f degrees' % value.ph)
-            ax4.grid(True)
-            ax4.set_xlim(value.maxFreq - value.ftWindow,
-                         value.maxFreq + value.ftWindow)
-            ax7.plot(value.frequency, np.abs(value.allFid[5][0]) * value.real[1][0] / np.abs(value.real[1][0]), label=(
-                '{:.1f} dBm\t{:.2f} mW power'.format(value.powerDbm, value.powerMw)).expandtabs())
-            ax7.set_title('FT after phasing to %.0f degrees' % value.ph)
-            ax7.grid(True)
-            ax7.set_xlim(value.maxFreq - value.ftWindow,
-                         value.maxFreq + value.ftWindow)
-            # Data for DNP figs
-            # centerFreq.append([((value.expTime-expStart)/60.),
-            #                    value.expCenterFreq, value.expNum, value.powerMw])
-        elif value.expType == 't1' and t1SeriesEval:
-            print('Plotting exp {} figures (T1)'.format(str(int(value.expNum))))
-            figure = plt.figure(figsize=figSize)
-            plt.errorbar(value.fitData[0], value.fitData[1],
-                         yerr=(value.fitData[1] - value.t1fit['evalY']),
-                         fmt='+',
-                         label='data: '+str(t1Calc), capthick=2, capsize=2)
-            plt.plot(value.t1fit['xdata'], value.t1fit['ydata'],
-                     label=value.t1fit['t1FitFormula'])
-            plt.annotate(r'$T_1={{{:.4f}}}\pm{{{:.4f}}}$'.format(
-                value.t1fit['t1'], value.t1fit['t1error']), xy=(0.4, 0.5), xycoords='axes fraction')
-            plt.title('$T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
-                value.powerMw, value.ph))
-            plt.xlabel('Time (s)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.tight_layout()
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(figure)
-            # Real part figure
-            figure = plt.figure(figsize=figSize)
-            for j in range(1, len(value.real)):
-                plt.plot(value.real[0], value.real[j], label='PC' + str(j))
-            plt.title('Real integral of phase cycle channels of $T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
-                value.powerMw, value.ph))
-            plt.plot(value.phC[0], value.phC[1], '--',
-                     label='PhaseCycled (sum after individual phasing)')
-            plt.xlabel('Time (s)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.tight_layout()
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1_PC_real.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(figure)
-            # Magnitude part figure
-            figure = plt.figure(figsize=figSize)
-            for j in range(1, len(value.magn)):
-                plt.plot(value.magn[0], value.magn[j], label='PC' + str(j))
-            plt.title('Magnitude integral of phase cycle channels of $T_1$ at {:.2f} mW power, {}$^\circ$ phase'.format(
-                value.powerMw, value.ph))
-            plt.plot(value.phC[0], value.phC[2], '--',
-                     label='PhaseCycled (sum after individual phasing)')
-            plt.xlabel('Time (s)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.tight_layout()
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('T1_PC_magn.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(figure)
-            # Figure for fourier transforms
-            figure = plt.figure(figsize=figSize)
-            for j, time in enumerate(value.allFid[5]):
-                if j % (value.phaseCycles) == 0:  # only first scan
-                    plt.plot(value.frequency, np.real(value.allFid[5][j]),
-                             label=('{:.2f}s'.format(value.vdList[int(j / value.phaseCycles)])))
-            plt.title('FT (real) at {:.2f} mW power, {}$^\circ$ phase'.format(
-                value.powerMw, value.ph))
-            plt.xlabel('Frequency (Hz)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.tight_layout()
-            plt.xlim(value.maxFreq - value.ftWindow,
-                     value.maxFreq + value.ftWindow)
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FT.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(figure)
-            # Figure for FIDs
-            # real
-            figure = plt.figure(figsize=figSize)
-            for j, time in enumerate(value.allFid[5]):
-                if j % (value.phaseCycles) == 0:  # only first scan
-                    plt.plot(value.fidTime, np.real(value.allFid[2][j]),
-                             label='{:.2f}s'.format(value.vdList[int(j / value.phaseCycles)]))
-            plt.title('$T_1$ FIDs at {:.2f} mW power, {}$^\circ$ phase'.format(
-                value.powerMw, value.ph))
-            plt.xlabel('Time (s)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.tight_layout()
-            plt.xlim(0, max(value.fidTime) / 3.)
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_corrected.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(figure)
-            # After exponential windowing
-            figure = plt.figure(figsize=figSize)
-            for j, time in enumerate(value.allFid[5]):
-                if j % (value.phaseCycles) == 0:  # only first scan
-                    plt.plot(value.fidTime, np.real(value.allFid[3][j]),
-                             label='{:.2f}s'.format(value.vdList[int(j / value.phaseCycles)]))
-            plt.title('$T_1$ FIDs at {:.2f} mW power, {}$^\circ$ phase'.format(
-                value.powerMw, value.ph))
-            plt.xlabel('Time (s)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.tight_layout()
-            plt.xlim(0, max(value.fidTime))
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_after_windowing.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(figure)
+                os.path.join(path, kw['evalPath'])))
 
-            figure = plt.figure(figsize=figSize)
-            # after corrections
-            for j, time in enumerate(value.allFid[5]):
-                if j % (value.phaseCycles) == 0:  # only first scan
-                    plt.plot(value.fidTimeHistory['bLeftShift'], np.real(value.allFid[0][j]),
-                             label='{:.2f}s'.format(value.vdList[int(j / value.phaseCycles)]))
-            plt.title('$T_1$ FIDs at {:.2f} mW power, {}$^\circ$ phase'.format(
-                value.powerMw, value.ph))
-            plt.xlabel('Time (s)')
-            plt.ylabel('Intensity (a.u.)')
-            plt.tight_layout()
-            plt.legend(loc='best', fancybox=True,
-                       shadow=True, fontsize='x-small')
-            [plt.savefig(os.path.join(path, str(int(value.expNum)), ('FID_raw.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(figure)
+    kw['figs'] = {}
+    # Single thread
+    test = [plot_exps_worker(result) for result in results]
+    # with concurrent.futures.ThreadPoolExecutor() as pool:
+    #     test = list(pool.map(plot_exps_worker, results))
+    # concurrent.futures.wait(test, timeout=None)
+    # concurrent.futures.wait(test)
+    print('The result of concurrent on figures is: ')
+    print(list(test))
+    
     # DNP figures
-    print("saving figures in {}".format(os.path.join(path, evalPath)))
+    print("saving figures in {}".format(os.path.join(path, kw['evalPath'])))
     # saving figures in evaluation directory
-    ax0.legend(loc='upper right', fancybox=True,
+    kw['dnp_raw_fid_ax'].legend(loc='upper right', fancybox=True,
                shadow=True, fontsize='x-small')
-    fig0.tight_layout()
-    [fig0.savefig(os.path.join(path, evalPath, ('01_FIDs_raw.' + x)),
-                  dpi=plotDpi) for x in plotExts]
-    plt.close(fig0)
-    ax1.legend(loc='upper right', fancybox=True,
+    kw['dnp_raw_fid'].tight_layout()
+    [kw['dnp_raw_fid'].savefig(os.path.join(path, kw['evalPath'], ('01_FIDs_raw.' + x)),
+                  dpi=kw['plotDpi']) for x in kw['plotExts']]
+    plt.close(kw['dnp_raw_fid'])
+    del kw['dnp_raw_fid']
+    kw['dnp_corrected_ax'].legend(loc='upper right', fancybox=True,
                shadow=True, fontsize='x-small')
-    fig1.tight_layout()
-    [fig1.savefig(os.path.join(path, evalPath, ('02_FIDs_after_LS_RS_baseline.' + x)),
-                  dpi=plotDpi) for x in plotExts]
-    plt.close(fig1)
-    ax2.legend(loc='upper right', fancybox=True,
+    kw['dnp_corrected'].tight_layout()
+    [kw['dnp_corrected'].savefig(os.path.join(path, kw['evalPath'], ('02_FIDs_after_LS_RS_baseline.' + x)),
+                  dpi=kw['plotDpi']) for x in kw['plotExts']]
+    plt.close(kw['dnp_corrected'])
+    del kw['dnp_corrected']
+    kw['dnp_zero_filled_ax'].legend(loc='upper right', fancybox=True,
                shadow=True, fontsize='x-small')
-    fig2.tight_layout()
-    [fig2.savefig(os.path.join(path, evalPath, ('03_FIDs_after_zero_filling.' + x)), dpi=plotDpi)
-     for x in plotExts]
-    plt.close(fig2)
-    ax3.legend(loc='upper right', fancybox=True,
+    kw['dnp_zero_filled'].tight_layout()
+    [kw['dnp_zero_filled'].savefig(os.path.join(path, kw['evalPath'], ('03_FIDs_after_zero_filling.' + x)), dpi=kw['plotDpi'])
+     for x in kw['plotExts']]
+    plt.close(kw['dnp_zero_filled'])
+    del kw['dnp_zero_filled']
+    kw['dnp_exp_win_ax'].legend(loc='upper right', fancybox=True,
                shadow=True, fontsize='x-small')
-    fig3.tight_layout()
-    [fig3.savefig(os.path.join(path, evalPath, ('04_FIDs_after_exp_windowing.' + x)), dpi=plotDpi)
-     for x in plotExts]
-    plt.close(fig3)
-    if make3dPlots:
+    kw['dnp_exp_win'].tight_layout()
+    [kw['dnp_exp_win'].savefig(os.path.join(path, kw['evalPath'], ('04_FIDs_after_exp_windowing.' + x)), dpi=kw['plotDpi'])
+     for x in kw['plotExts']]
+    plt.close(kw['dnp_exp_win'])
+    del kw['dnp_exp_win']
+    if kw['make3dPlots']:
         try:
-            # 3D FT plot
-            print("Plotting 3D views")
-            fig13d = plt.figure(figsize=figSize)
-            ax13d = fig13d.gca(projection='3d')
-            ax13d.set_title(
-                'NMR FIDs after baseline/offset correction (magn.)')
-            ax13d.set_xlabel('time (ms)')
-            ax13d.set_zlabel('Signal (a.u.)')
-            ax13d.set_ylabel('Experiment index')
-            # 3D plots for FIDs
-            [ax13d.plot3D(value.fidTimeHistory['bZeroFilling'], np.abs(value.allFid[1][0]), value.expNum, zdir='y',
+            [kw['dnp_corrected_3d_ax'].plot3D(value.fidTimeHistory['bZeroFilling'], np.abs(value.allFid[1][0]), value.expNum, zdir='y',
                           zorder=int(-value.expNum), color=colors[i]) for i, value in
              enumerate(x for x in results if x.expType == 'dnp')]
             xmin, xmax = min([min(a.fidTimeHistory['bZeroFilling']) for a in results if a.expType == 'dnp']), max(
@@ -1534,25 +1564,18 @@ def make_figures(results, path='', **kwargs):
                       for a in results if a.expType == 'dnp']
             plt.yticks(zs, labels,
                        rotation=270)
-            for i, label in enumerate(ax13d.get_yticklabels()):
+            for i, label in enumerate(kw['dnp_corrected_3d_ax'].get_yticklabels()):
                 if label.get_text():
                     label.set_color(colors[i])
-            ax13d.grid(True)
-            ax13d.set_xlim3d(xmin, xmax)
-            ax13d.set_zlim3d(zmin, zmax)
-            ax13d.set_ylim3d(min(zs), max(zs))
-            ax13d.yaxis.labelpad = 45
-            ax13d.view_init(elev=17., azim=-23.)
-            fig13d.tight_layout()
-            [fig13d.savefig(os.path.join(path, evalPath, ('01_FIDs_raw_3D.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(fig13d)
-            fig43d = plt.figure(figsize=figSize)
-            ax43d = fig43d.gca(projection='3d')
-            ax43d.set_title('NMR FTs after exponential windowing (real)')
-            ax43d.set_xlabel('Frequency offset (Hz)')
-            ax43d.set_zlabel('Intensity (a.u.)')
-            ax43d.set_ylabel('Experiment index')
+            kw['dnp_corrected_3d_ax'].set_xlim3d(xmin, xmax)
+            kw['dnp_corrected_3d_ax'].set_zlim3d(zmin, zmax)
+            kw['dnp_corrected_3d_ax'].set_ylim3d(min(zs), max(zs))
+            kw['dnp_corrected_3d_ax'].yaxis.labelpad = 45
+            kw['dnp_corrected_3d_ax'].view_init(elev=17., azim=-23.)
+            kw['dnp_corrected_3d'].tight_layout()
+            [kw['dnp_corrected_3d'].savefig(os.path.join(path, kw['evalPath'], ('01_FIDs_raw_3D.' + x)), dpi=kw['plotDpi'])
+             for x in kw['plotExts']]
+            plt.close(kw['dnp_corrected_3d'])
             xmin, xmax = min([a.maxFreq - a.ftWindow for a in results if a.expType == 'dnp']), max(
                 [a.maxFreq + a.ftWindow for a in results if a.expType == 'dnp'])
             zmin, zmax = min([min(np.real(a.allFid[5][0])) for a in results if a.expType == 'dnp']), max(
@@ -1563,29 +1586,23 @@ def make_figures(results, path='', **kwargs):
             poly = PolyCollection(verts, facecolors=colors)
             poly.set_alpha(0.6)
             plt.yticks(zs, labels, rotation=270)
-            for i, label in enumerate(ax43d.get_yticklabels()):
+            for i, label in enumerate(kw['dnp_ft_real_3d_ax'].get_yticklabels()):
                 if label.get_text():
                     label.set_color(colors[i])
-            ax43d.view_init(elev=17., azim=-23.)
-            ax43d.grid(True)
-            ax43d.set_xlim3d(xmin, xmax)
-            ax43d.set_zlim3d(zmin, zmax)
-            ax43d.set_ylim3d(min(zs), max(zs))
-            ax43d.add_collection3d(poly, zs=zs, zdir='y')
-            ax43d.view_init(elev=17., azim=-23.)
-            ax43d.yaxis.labelpad = 45
-            ax43d.legend(loc='upper right', fancybox=True,
+            kw['dnp_ft_real_3d_ax'].view_init(elev=17., azim=-23.)
+            kw['dnp_ft_real_3d_ax'].set_xlim3d(xmin, xmax)
+            kw['dnp_ft_real_3d_ax'].set_zlim3d(zmin, zmax)
+            kw['dnp_ft_real_3d_ax'].set_ylim3d(min(zs), max(zs))
+            kw['dnp_ft_real_3d_ax'].add_collection3d(poly, zs=zs, zdir='y')
+            kw['dnp_ft_real_3d_ax'].view_init(elev=17., azim=-23.)
+            kw['dnp_ft_real_3d_ax'].yaxis.labelpad = 45
+            kw['dnp_ft_real_3d_ax'].legend(loc='upper right', fancybox=True,
                          shadow=True, fontsize='x-small')
-            fig43d.tight_layout()
-            [fig43d.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing_real_3d.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(fig43d)
-            fig73d = plt.figure(figsize=figSize)
-            ax73d = fig73d.gca(projection='3d')
-            ax73d.set_title('NMR FTs after exponential windowing (magnitude)')
-            ax73d.set_xlabel('Frequency offset (Hz)')
-            ax73d.set_zlabel('Intensity (a.u.)')
-            ax73d.set_ylabel('Experiment index')
+            kw['dnp_ft_real_3d'].tight_layout()
+            [kw['dnp_ft_real_3d'].savefig(os.path.join(path, kw['evalPath'], ('05_FT_after_phasing_real_3d.' + x)), dpi=kw['plotDpi'])
+             for x in kw['plotExts']]
+            plt.close(kw['dnp_ft_real_3d'])
+            del kw['dnp_ft_real_3d']
             verts = [list(zip(a.frequency[np.logical_and(a.frequency > xmin, a.frequency < xmax)], (
                 np.abs(a.allFid[5][0][np.logical_and(a.frequency > xmin, a.frequency < xmax)]) * a.real[1][0] / np.abs(
                     a.real[1][0])))) for a in results if a.expType == 'dnp']
@@ -1597,38 +1614,40 @@ def make_figures(results, path='', **kwargs):
             poly = PolyCollection(verts, facecolors=colors)
             poly.set_alpha(0.6)
             plt.yticks(zs, labels, rotation=270)
-            for i, label in enumerate(ax73d.get_yticklabels()):
+            for i, label in enumerate(kw['dnp_ft_magn_3d_ax'].get_yticklabels()):
                 if label.get_text():
                     label.set_color(colors[i])
-            ax73d.grid(True)
-            ax73d.set_xlim3d(xmin, xmax)
-            ax73d.set_zlim3d(zmin, zmax)
-            ax73d.set_ylim3d(min(zs), max(zs))
-            ax73d.add_collection3d(poly, zs=zs, zdir='y')
-            ax73d.view_init(elev=17., azim=-23.)
-            ax73d.yaxis.labelpad = 45
-            ax73d.legend(loc='upper right', fancybox=True,
+            kw['dnp_ft_magn_3d_ax'].set_xlim3d(xmin, xmax)
+            kw['dnp_ft_magn_3d_ax'].set_zlim3d(zmin, zmax)
+            kw['dnp_ft_magn_3d_ax'].set_ylim3d(min(zs), max(zs))
+            kw['dnp_ft_magn_3d_ax'].add_collection3d(poly, zs=zs, zdir='y')
+            kw['dnp_ft_magn_3d_ax'].view_init(elev=17., azim=-23.)
+            kw['dnp_ft_magn_3d_ax'].yaxis.labelpad = 45
+            kw['dnp_ft_magn_3d_ax'].legend(loc='upper right', fancybox=True,
                          shadow=True, fontsize='x-small')
-            # fig73d.colorbar(test)
-            fig73d.tight_layout()
-            [fig73d.savefig(os.path.join(path, evalPath, ('06_FT_after_phasing_magn_3d.' + x)), dpi=plotDpi)
-             for x in plotExts]
-            plt.close(fig73d)
+            # dnp_ft_magn_3d.colorbar(test)
+            kw['dnp_ft_magn_3d'].tight_layout()
+            [kw['dnp_ft_magn_3d'].savefig(os.path.join(path, kw['evalPath'], ('06_FT_after_phasing_magn_3d.' + x)), dpi=kw['plotDpi'])
+             for x in kw['plotExts']]
+            plt.close(kw['dnp_ft_magn_3d'])
+            del kw['dnp_ft_magn_3d']
         except Exception as e:
             print('Error "{}" occured while making 3D plots'.format(e))
-    ax4.legend(loc='upper right', fancybox=True,
+    kw['dnp_ft_real_ax'].legend(loc='upper right', fancybox=True,
                shadow=True, fontsize='x-small')
-    fig4.tight_layout()
-    [fig4.savefig(os.path.join(path, evalPath, ('05_FT_after_phasing_real.' + x)), dpi=plotDpi)
-     for x in plotExts]
-    plt.close(fig4)
-    ax7.legend(loc='upper right', fancybox=True,
+    kw['dnp_ft_real'].tight_layout()
+    [kw['dnp_ft_real'].savefig(os.path.join(path, kw['evalPath'], ('05_FT_after_phasing_real.' + x)), dpi=kw['plotDpi'])
+     for x in kw['plotExts']]
+    plt.close(kw['dnp_ft_real'])
+    kw['dnp_ft_magn_ax'].legend(loc='upper right', fancybox=True,
                shadow=True, fontsize='x-small')
-    fig7.tight_layout()
-    [fig7.savefig(os.path.join(path, evalPath, ('06_FT_after_phasing_magn.' + x)), dpi=plotDpi)
-     for x in plotExts]
-    plt.close(fig7)
-    plt.close(fig5)
+    kw['dnp_ft_magn'].tight_layout()
+    [kw['dnp_ft_magn'].savefig(os.path.join(path, kw['evalPath'], ('06_FT_after_phasing_magn.' + x)), dpi=kw['plotDpi'])
+     for x in kw['plotExts']]
+    plt.close(kw['dnp_ft_magn'])
+    del kw['dnp_ft_magn']
+    plt.close(kw['time_center_freq'])
+    del kw['time_center_freq']
 
 
 def fit_t1(time, intensity, si00=-1e7, t10=.5, c0=-1e7, spaceNo=500, t1ErrorTol=0.5):  # T1 fitting
@@ -1805,10 +1824,10 @@ def calculate_dnp_enh(results, phase):
                 normMagn = result.magn[1][0]
             # Work-around for phasing problem
             if phase == 'all' and result.powerMw > enhMinPower:
-                dnpEnhLine = [result.expNum, result.powerMw, result.powerDbm, -result.real[1][0],
+                dnpEnhLine = [int(result.expNum), result.powerMw, result.powerDbm, -result.real[1][0],
                               -result.real[1][0] / normReal, -result.magn[1][0], -result.magn[1][0] / normMagn]
             else:
-                dnpEnhLine = [result.expNum, result.powerMw, result.powerDbm, result.real[1][0],
+                dnpEnhLine = [int(result.expNum), result.powerMw, result.powerDbm, result.real[1][0],
                               result.real[1][0] / normReal, result.magn[1][0], result.magn[1][0] / normMagn]
 
             if result.powerMw >= powerMw:
