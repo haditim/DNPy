@@ -236,6 +236,7 @@ class NMRData(object):
             self.dwellTime = dwellTime
             self.expNum = os.path.basename(directory)
         self.calculate_phase_cycles()
+        # self.calculate_exp_integral
         # HADI: I want to keep track of time after processing
         self.fidTimeHistory['orig'] = self.fidTime
         self.power_calc(**kwargs)
@@ -728,7 +729,7 @@ class NMRData(object):
     def calculate_phase_cycles(self):
         try:
             self.phaseCycles = len(self.allFid[0]) / len(self.vdList)
-            vdListLen = len(self.vdList)
+            self.vdListLen = len(self.vdList)
             if int(self.phaseCycles) != self.phaseCycles:
                 raise ValueError
         except ValueError:
@@ -740,7 +741,7 @@ class NMRData(object):
             if self.debug:
                 print('No phase cycling channel found ({}).'.format(e))
             self.phaseCycles = 1
-            vdListLen = 1
+            self.vdListLen = 1
 
     def process(self):
         """ Process routine for DNP enhancement, k_sigma and T1 data. """
@@ -797,7 +798,7 @@ class NMRData(object):
             if self.debug:
                 print("Center frequency for this exp.: {}".format(self.maxFreq))
             if i % (self.phaseCycles) == 0:  # appending time values
-                if vdListLen > 1:
+                if self.vdListLen > 1:
                     self.real[0].append(self.vdList[int(i / self.phaseCycles)])
                     self.magn[0].append(self.vdList[int(i / self.phaseCycles)])
                     self.phC[0].append(self.vdList[int(i / self.phaseCycles)])
@@ -1077,8 +1078,7 @@ def process_exps(results, path):
         print('No DNP exps. found, no enhancement/kSigma curve will be created.')
     if kw['t1SeriesEval'] or kw['kSigmaCalc']:
         print(r"Fitting T1")
-        calculate_t1_series(results)
-        if not kw['t1Series']:
+        if not calculate_t1_series(results):
             print(
                 'Did not find any T1 experiment. no T1 series fitting, no kSigma calculation')
             kw['t1SeriesEval'] = False
@@ -1102,17 +1102,18 @@ def process_exps(results, path):
 
 def dumpAllToCSV(results, path):
     # dnpEnh: expNum, powerMw, powerDbm, intReal, normIntReal, intMagn, normIntMagn, forward
-    np.savetxt(os.path.join(path, kw['evalPath'], 'enhancements.csv'), kw['dnpEnh'], delimiter='\t',
+    print(kw['dnpEnh'])
+    np.savetxt(os.path.join(path, kw['evalPath'], 'enhancements.csv'), kw['dnpEnh'], delimiter='\t', fmt='%s',
                header=('expNum\tpowerMw\tpowerDbm\tintReal\tnormIntReal\tintMagn\tnormIntMagn\tforward'))
     # t1Series: expNum, powerMw, powerDbm, t1, t1error
     if kw['t1SeriesEval']:
-        np.savetxt(os.path.join(path, kw['evalPath'], kw['t1series']+'.csv'), kw['t1Series'], delimiter='\t',
+        np.savetxt(os.path.join(path, kw['evalPath'], kw['t1series']+'.csv'), kw['t1Series'], delimiter='\t', fmt='%s',
                    header=('expNum\tpowerMw\tpowerDbm\tt1\tt1error'))
         if kw['kSigmaCalc']:
             np.savetxt(os.path.join(path, kw['evalPath'], 'ksigma.csv'),
                        np.asarray(
                            (kw['dnpEnh'][:, 1], kw['kSigmaFit']['kSigmaCor'], kw['kSigmaFit']['kSigmaUncor'])).transpose(),
-                       delimiter='\t', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
+                       delimiter='\t', fmt='%s', header=('powerMw\tkSigmaCor\tkSigmaUncor'))
 
 
 def make_figures(results, path='', **kwargs):
@@ -1845,6 +1846,7 @@ def calculate_t1_series(results):
                              result.t1fit['t1error']])
             t1Counter += 1
     t1Series = np.asarray(t1Series)
+    print(t1Series)
     t1SeriesPolDeg = kw.get('t1SeriesPolDeg', 1)
     try:
         t1FitSeries = fit_t1_series(
